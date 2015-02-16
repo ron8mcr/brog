@@ -4,3 +4,4 @@ from filesharing.models import *
 
 admin.site.register(Directory, MPTTModelAdmin)
 admin.site.register(File)
+admin.site.register(UserProfile)
