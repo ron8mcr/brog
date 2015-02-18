@@ -1,11 +1,13 @@
+# -*- coding: utf-8 -*-
 from django.db import models
 from mptt.models import MPTTModel, TreeForeignKey
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, UserManager
 import os
 
-
-class UserProfile(models.Model):
+class UserProfile(User):
     user = models.OneToOneField(User, related_name='profile')
+
+    objects = UserManager()
 
     def get_home_directory(self):
         return Directory.objects.root_nodes().filter(owner=self.user)
