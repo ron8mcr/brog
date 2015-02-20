@@ -74,9 +74,11 @@ TEMPLATE_CONTEXT_PROCESSORS = (
 # auth and allauth settings
 LOGIN_REDIRECT_URL = '/'
 SOCIALACCOUNT_QUERY_EMAIL = True
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'    #This will avoid the need for an SMTP server as e-mails
-                                                                    # will be printed to the console. For more information, please refer to:
-                                                                    #https://docs.djangoproject.com/en/dev/ref/settings/#email-host
+
+#This will avoid the need for an SMTP server as e-mails
+# will be printed to the console. For more information, please refer to:
+#https://docs.djangoproject.com/en/dev/ref/settings/#email-host
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 
 SOCIALACCOUNT_PROVIDERS = \

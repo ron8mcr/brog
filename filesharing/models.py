@@ -2,55 +2,77 @@
 from django.db import models
 from mptt.models import MPTTModel, TreeForeignKey
 from django.contrib.auth.models import AbstractUser
-import os
+from os.path import join, basename
 
 
 class User(AbstractUser):
-    my_field = models.CharField(max_length=256)
-
-    def get_home_directory(self):
+    @property
+    def home_directory(self):
         return Directory.objects.root_nodes().filter(owner=self.user)
 
 
+class AccessType():
+    NONE = 0
+    GROUP = 1
+    REGISTERED = 2
+    ALL = 4
+
+    GROUP_CHOICES = (
+        (NONE, 'NONE'),
+        (GROUP, 'GROUP'),
+        (REGISTERED, 'REGISTERED'),
+        (ALL, 'ALL')
+    )
+
+
 class Directory(MPTTModel):
-    name = models.CharField(max_length=256)
-    owner = models.ForeignKey(User, related_name="user_owner")
+    name = models.CharField(max_length=256, verbose_name="Название")
+    owner = models.ForeignKey(User, related_name="user_owner",
+                              verbose_name="Владелец")
+    parent = TreeForeignKey('self', null=True, blank=True,
+                            related_name='children',
+                            verbose_name="Родительская директория")
+    access_type = models.IntegerField(choices=AccessType.GROUP_CHOICES,
+                                      default=AccessType.NONE,
+                                      verbose_name="Тип доступа")
 
     # пользователи, которым разрешён доступ (если таковые имеются)
     allowed_users = models.ManyToManyField(
-        User, blank=True, related_name="users_allowed")
+        User, blank=True, related_name="users_allowed",
+        verbose_name="Допущенные пользователи")
 
-    # какой группе разрешен доступ
-    # 'all' - всем
-    # 'all_registered' - всем зарегестрированным
-    # 'group' - группе зарегистрированных пользователей
-    # 'none' - только владельцу
-    access_type = models.CharField(max_length=20)
-    parent = TreeForeignKey('self', null=True, blank=True,
-                            related_name='children')
+    def __str__(self):
+        return self.full_path
+        #return self.name
+
+    @property
+    def full_path(self):
+        return join([i.name for i in self.get_ancestors(include_self=True)])
 
     class MPTTMeta:
         order_insertion_by = ['name']
 
-    def __str__(self):
-        return self.get_full_path()
-        #return self.name
-
-    def get_full_path(self):
-        return '/'.join([i.name for i in self.get_ancestors(include_self=True)])
+    class Meta:
+        verbose_name = "Директория"
+        verbose_name_plural = "Директории"
 
 
 class File(models.Model):
-    #parent = TreeForeignKey(Directory,
-                        # null=True, blank=True, related_name='children')
-    my_file = models.FileField()
-    parent = models.ForeignKey(Directory)
+    my_file = models.FileField(verbose_name="Файл")
+    parent = models.ForeignKey(Directory,
+                               verbose_name="Родительская директория")
 
     def __str__(self):
          return self.get_full_path()
 
-    def get_full_path(self):
-        return self.parent.get_full_path() + '/' + self.get_file_name()
+    @property
+    def file_name(self):
+        return basename(self.my_file.name)
 
-    def get_file_name(self):
-        return os.path.basename(self.my_file.name)
+    @property
+    def full_path(self):
+        return join(self.parent.full_path(), self.file_name)
+
+    class Meta():
+        verbose_name = "Файл"
+        verbose_name_plural = "Файлы"
