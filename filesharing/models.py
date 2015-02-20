@@ -96,7 +96,7 @@ class File(models.Model):
 
     @property
     def full_path(self):
-        return os.path.join(self.parent.full_path, self.file_name)
+        return os.path.join(self.parent.full_path, self.name)
 
     class Meta():
         verbose_name = "Файл"
