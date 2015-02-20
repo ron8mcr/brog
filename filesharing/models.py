@@ -3,39 +3,23 @@ from django.db import models
 from mptt.models import MPTTModel, TreeForeignKey
 from django.contrib.auth.models import User, UserManager
 import os
-from django.db.models.signals import post_save
-from allauth.socialaccount.signals import social_account_added
 
+class UserProfile(User):
+    user = models.OneToOneField(User, related_name='profile')
 
-class CustomUser(User):
-    my_field = models.CharField(max_length=128)
     objects = UserManager()
 
     def get_home_directory(self):
         return Directory.objects.root_nodes().filter(owner=self.user)
 
 
-def create_custom_user(sender, instance, created, **kwargs):
-    if created:
-        values = {}
-        for field in sender._meta.local_fields:
-            values[field.attname] = getattr(instance, field.attname)
-        user = CustomUser(**values)
-        user.save()
-
-# перехватываем сигналы на сохранение нового пользователя
-# как локального, так и через соц сети
-post_save.connect(create_custom_user, User)
-social_account_added.connect(create_custom_user)
-
-
 class Directory(MPTTModel):
     name = models.CharField(max_length=256)
-    owner = models.ForeignKey(CustomUser, related_name="user_owner")
+    owner = models.ForeignKey(UserProfile, related_name="user_owner")
 
     # пользователи, которым разрешён доступ (если таковые имеются)
     allowed_users = models.ManyToManyField(
-        CustomUser, blank=True, related_name="users_allowed")
+        UserProfile, blank=True, related_name="users_allowed")
 
     # какой группе разрешен доступ
     # 'all' - всем
