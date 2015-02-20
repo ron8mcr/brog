@@ -2,13 +2,21 @@
 from django.db import models
 from mptt.models import MPTTModel, TreeForeignKey
 from django.contrib.auth.models import AbstractUser
-from os.path import join, basename
+import os
+from allauth.account.signals import user_signed_up
+from django.dispatch import receiver
+from django.db.models.signals import pre_save
 
 
 class User(AbstractUser):
     @property
     def home_directory(self):
         return Directory.objects.root_nodes().filter(owner=self.user)
+
+
+@receiver(user_signed_up)
+def make_home_dir(user, **kwargs):
+    home_dir = Directory.objects.create(name=user.username, owner=user)
 
 
 class AccessType():
@@ -43,11 +51,10 @@ class Directory(MPTTModel):
 
     def __str__(self):
         return self.full_path
-        #return self.name
 
     @property
     def full_path(self):
-        return join([i.name for i in self.get_ancestors(include_self=True)])
+        return os.path.join(*[i.name for i in self.get_ancestors(include_self=True)])
 
     class MPTTMeta:
         order_insertion_by = ['name']
@@ -63,15 +70,15 @@ class File(models.Model):
                                verbose_name="Родительская директория")
 
     def __str__(self):
-         return self.get_full_path()
+        return self.full_path
 
     @property
     def file_name(self):
-        return basename(self.my_file.name)
+        return os.path.basename(self.my_file.name)
 
     @property
     def full_path(self):
-        return join(self.parent.full_path(), self.file_name)
+        return os.path.join(self.parent.full_path, self.file_name)
 
     class Meta():
         verbose_name = "Файл"
