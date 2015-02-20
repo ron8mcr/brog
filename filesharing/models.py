@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 from django.db import models
 from mptt.models import MPTTModel, TreeForeignKey
-from django.contrib.auth.models import User, UserManager
+from django.contrib.auth.models import AbstractUser
 import os
 
-class UserProfile(User):
-    user = models.OneToOneField(User, related_name='profile')
 
-    objects = UserManager()
+class User(AbstractUser):
+    my_field = models.CharField(max_length=256)
 
     def get_home_directory(self):
         return Directory.objects.root_nodes().filter(owner=self.user)
@@ -15,11 +14,11 @@ class UserProfile(User):
 
 class Directory(MPTTModel):
     name = models.CharField(max_length=256)
-    owner = models.ForeignKey(UserProfile, related_name="user_owner")
+    owner = models.ForeignKey(User, related_name="user_owner")
 
     # пользователи, которым разрешён доступ (если таковые имеются)
     allowed_users = models.ManyToManyField(
-        UserProfile, blank=True, related_name="users_allowed")
+        User, blank=True, related_name="users_allowed")
 
     # какой группе разрешен доступ
     # 'all' - всем

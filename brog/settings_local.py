@@ -1,7 +1,7 @@
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
-SITE_ID = 2
+SITE_ID = 1
 
 DATABASES = {
     'default': {

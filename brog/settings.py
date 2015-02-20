@@ -94,6 +94,7 @@ ROOT_URLCONF = 'brog.urls'
 
 WSGI_APPLICATION = 'brog.wsgi.application'
 
+AUTH_USER_MODEL = 'filesharing.User'
 
 
 # Internationalization
@@ -121,4 +122,4 @@ TEMPLATE_DIRS = (
 MEDIA_URL = '/media/'
 STATIC_URL = '/static/'
 
-
+from .settings_local import *
