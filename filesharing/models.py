@@ -56,6 +56,24 @@ class Directory(MPTTModel):
     def full_path(self):
         return os.path.join(*[i.name for i in self.get_ancestors(include_self=True)])
 
+    @classmethod
+    def get_by_full_path(cls, path):
+        # TODO: переделать всю
+        dirs = [i for i in path.split('/') if i]
+        if not dirs:
+            return None
+        try:
+            parent = Directory.objects.get(parent=None, name=dirs[0])
+        except Directory.DoesNotExist:
+            parent = None
+
+        for d in dirs[1:]:
+            try:
+                parent = parent.get_children().get(name=d)
+            except Directory.DoesNotExist:
+                return None
+        return parent
+
     class MPTTMeta:
         order_insertion_by = ['name']
 
@@ -73,7 +91,7 @@ class File(models.Model):
         return self.full_path
 
     @property
-    def file_name(self):
+    def name(self):
         return os.path.basename(self.my_file.name)
 
     @property

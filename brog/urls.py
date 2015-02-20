@@ -8,9 +8,11 @@ from django.conf.urls.static import static
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 from django.views.generic.base import TemplateView
+
 admin.autodiscover()
 
 from brog.views import *
+from filesharing.views import *
 
 urlpatterns = patterns('',
     # Examples:
@@ -19,9 +21,10 @@ urlpatterns = patterns('',
 
     url(r'^accounts/', include('allauth.urls')),
     url(r'^$', index),
-    url(r'^home$', home),
     url(r'^accounts/profile/$', TemplateView.as_view(template_name='profile.html')),
     url(r'^admin/', include(admin.site.urls)),
+    url(r'^(?P<full_path>[получаем полный путь])', FilesView.as_view()),
+
 )
 
 # TEMP для просмотра загруженных файлов

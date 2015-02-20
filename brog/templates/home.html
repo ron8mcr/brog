@@ -74,7 +74,16 @@
        
        
        
-        <div class="col-xs-9 col-centered">s</div>    
+        <div class="col-xs-9 col-centered">
+            --------- dirs -----------
+            {% for file in file_list %}
+                <p> {{ file.name }}</p>
+            {% endfor %}
+            --------- files ------------
+            {% for file in files %}
+                <p> {{ file.name }}</p>
+            {% endfor %}
+        </div>
         
     </div>
 </div>
