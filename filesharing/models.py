@@ -5,6 +5,10 @@ from django.contrib.auth.models import AbstractUser
 import os
 from allauth.account.signals import user_signed_up
 from django.dispatch import receiver
+from mptt.managers import TreeManager
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.models.manager import Manager
+from django.db.utils import IntegrityError
 from django.db.models.signals import pre_save
 
 
@@ -14,6 +18,7 @@ class User(AbstractUser):
         return Directory.objects.root_nodes().filter(owner=self.user)
 
 
+# создание домашней папки для каждого пользователя
 @receiver(user_signed_up)
 def make_home_dir(user, **kwargs):
     home_dir = Directory.objects.create(name=user.username, owner=user)
@@ -33,8 +38,31 @@ class AccessType():
     )
 
 
+class DirectoryManager(TreeManager):
+    """ Собственный менеджер для директорий.
+    Добавляет возможность выбора директории по полному пути
+    """
+    def get_by_full_path(self, path):
+        # TODO: переделать всю
+        dirs_in_path = [i for i in path.split('/') if i]
+        if not dirs_in_path:
+            return None
+        try:
+            parent = self.root_nodes().get(name=dirs_in_path[0])
+        except ObjectDoesNotExist:
+            return None
+
+        for d in dirs_in_path[1:]:
+            try:
+                parent = parent.get_children().get(name=d)
+            except ObjectDoesNotExist:
+                return None
+        return parent
+
+
 class Directory(MPTTModel):
-    name = models.CharField(max_length=256, verbose_name="Название")
+    objects = DirectoryManager()
+    name = models.CharField(max_length=256, verbose_name="Имя")
     owner = models.ForeignKey(User, related_name="user_owner",
                               verbose_name="Владелец")
     parent = TreeForeignKey('self', null=True, blank=True,
@@ -54,25 +82,8 @@ class Directory(MPTTModel):
 
     @property
     def full_path(self):
-        return os.path.join(*[i.name for i in self.get_ancestors(include_self=True)])
-
-    @classmethod
-    def get_by_full_path(cls, path):
-        # TODO: переделать всю
-        dirs = [i for i in path.split('/') if i]
-        if not dirs:
-            return None
-        try:
-            parent = Directory.objects.get(parent=None, name=dirs[0])
-        except Directory.DoesNotExist:
-            parent = None
-
-        for d in dirs[1:]:
-            try:
-                parent = parent.get_children().get(name=d)
-            except Directory.DoesNotExist:
-                return None
-        return parent
+        return os.path.join(*[i.name for i in
+                              self.get_ancestors(include_self=True)])
 
     class MPTTMeta:
         order_insertion_by = ['name']
@@ -80,19 +91,41 @@ class Directory(MPTTModel):
     class Meta:
         verbose_name = "Директория"
         verbose_name_plural = "Директории"
+        unique_together = ("parent", "name")
+
+
+class FileManager(Manager):
+    """ Собственный менеджер для файлов.
+    Добавляет возможность поиска файла по полному пути
+    """
+    def get_by_full_path(self, path):
+        path = path.rstrip('/')
+        dirs_path, name = os.path.split(path)
+        parent = Directory.objects.get_by_full_path(dirs_path)
+        try:
+            return self.get(name=name, parent=parent)
+        except ObjectDoesNotExist:
+            return None
 
 
 class File(models.Model):
+    objects = FileManager()
     my_file = models.FileField(verbose_name="Файл")
     parent = models.ForeignKey(Directory,
                                verbose_name="Родительская директория")
+    name = models.CharField(max_length=256, verbose_name="Имя", blank=True)
+
+    # при сохранении надо "вычислить" поле name
+    def save(self, *args, **kwargs):
+        # жизненный цикл файла не включает переименование
+        # но filefield при пересохранении меняет физическое имя файла
+        # так что есть проверка
+        if not self.name:
+            self.name = os.path.basename(self.my_file.name)
+        super(File, self).save(*args, **kwargs)
 
     def __str__(self):
         return self.full_path
-
-    @property
-    def name(self):
-        return os.path.basename(self.my_file.name)
 
     @property
     def full_path(self):
@@ -101,3 +134,26 @@ class File(models.Model):
     class Meta():
         verbose_name = "Файл"
         verbose_name_plural = "Файлы"
+        unique_together = ("parent", "name")
+
+
+# исключаем сохранение в одной директории
+# файлов и директорий с одинаковыми именами
+def check_duplicate(sender, instance, **kwargs):
+    if sender == Directory:
+        another_type = File
+    else:
+        another_type = Directory
+    parent = instance.parent
+    try:
+        # если файла|директории нет - всё нормально
+        # если есть - ошибка
+        another_type.objects.get(parent=parent, name=instance.name)
+    except another_type.DoesNotExist:
+        return
+    raise IntegrityError("В одной директории не может быть "
+                         "файла и директории с одинаковыми именами")
+
+
+pre_save.connect(check_duplicate, sender=Directory)
+pre_save.connect(check_duplicate, sender=File)

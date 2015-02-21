@@ -14,16 +14,12 @@ class IndexView(TemplateView):
 #TODO: переделать
 class FilesView(ListView):
     model = Directory
-
-    context_object_name="file_list"
-
-    template_name  = 'home.html'
-
+    context_object_name = "file_list"
+    template_name = 'home.html'
 
     def __init__(self):
         #получаем текущую Директорию из всего пути
         self.cur_dir = Directory.objects.get_by_full_path(self.kwargs['full_path'])
-
 
     #добавляем список файлов в контекст для текущей директории
     def get_context_data(self, **kwargs):
