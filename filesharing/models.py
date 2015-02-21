@@ -85,6 +85,18 @@ class Directory(MPTTModel):
         return os.path.join(*[i.name for i in
                               self.get_ancestors(include_self=True)])
 
+    # TODO: тщательно протестировать
+    # имеет ли пользователь доступ к папке
+    def has_access(self, user):
+        if self.access_type == AccessType.ALL:
+            return True
+        elif self.access_type == AccessType.NONE:
+            return user == self.owner
+        elif self.access_type == AccessType.GROUP:
+            return user in self.allowed_users
+        elif self.access_type == AccessType.REGISTERED:
+            return user.is_authenticated()
+
     class MPTTMeta:
         order_insertion_by = ['name']
 
@@ -130,6 +142,9 @@ class File(models.Model):
     @property
     def full_path(self):
         return os.path.join(self.parent.full_path, self.name)
+
+    def has_access(self, user):
+        return self.parent.has_access(user)
 
     class Meta():
         verbose_name = "Файл"

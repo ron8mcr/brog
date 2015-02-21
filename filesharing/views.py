@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from django.http import HttpResponseRedirect
 from filesharing.models import *
 
-from django.views.generic import ListView, TemplateView
+from django.views.generic import DetailView, TemplateView
 
 
 class IndexView(TemplateView):
@@ -12,22 +12,43 @@ class IndexView(TemplateView):
 
 
 #TODO: переделать
-class FilesView(ListView):
-    model = Directory
-    context_object_name = "file_list"
+class FilesView(TemplateView):
+    errors = {
+        'BAD_PATH': "Введенный путь не существует",
+        'ACCESS_DENIED': "Вам сюда доступ запрещён"
+    }
     template_name = 'home.html'
 
-    def __init__(self):
-        #получаем текущую Директорию из всего пути
-        self.cur_dir = Directory.objects.get_by_full_path(self.kwargs['full_path'])
+    def list_dir(self):
+        """
+        :return:Список файлов и директорий в запрошенной директории, если есть доступ
+                или ошибку
+        """
+        if self.cur_dir.has_access(self.request.user):
+            content = dict()
+            content['files'] = File.objects.filter(parent=self.cur_dir)
+            content['dirs'] = Directory.objects.filter(parent=self.cur_dir)
+            content['parent'] = self.cur_dir.parent
+            return content
+        else:
+            return {'error': self.errors['ACCESS_DENIED']}
 
-    #добавляем список файлов в контекст для текущей директории
     def get_context_data(self, **kwargs):
+        path = self.kwargs['path']
         context = super(FilesView, self).get_context_data(**kwargs)
-        context['files'] = File.objects.filter(parent=self.cur_dir)
-        return context
 
-    #получаем список директорий текущей директории
-    def get_queryset(self):
-        dirs = Directory.objects.filter(parent=self.cur_dir).filter(owner=self.request.user)
-        return dirs
+        self.cur_dir = Directory.objects.get_by_full_path(path)
+        if self.cur_dir:
+            context.update(self.list_dir())
+        else:
+            self.cur_file = File.objects.get_by_full_path(path)
+            if self.cur_file:
+                # TODO: что же делать, если запрошен файл? redirect?
+                if self.cur_file.has_access(self.request.user):
+                    context['file'] = self.cur_file
+                else:
+                    context['error'] = self.errors['ACCESS_DENIED']
+
+            else:
+                context['error'] = self.errors['BAD_PATH']
+        return context
