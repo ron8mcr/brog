@@ -22,7 +22,7 @@ urlpatterns = patterns('',
     url(r'^$', index),
     url(r'^accounts/profile/$', TemplateView.as_view(template_name='profile.html')),
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^(?P<full_path>[получаем полный путь])', FilesView.as_view()),
+    url(r'(?P<path>.+)/$', FilesView.as_view()),
 
 )
 

@@ -75,14 +75,27 @@
        
        
         <div class="col-xs-9 col-centered">
-            --------- dirs -----------
-            {% for file in file_list %}
-                <p> {{ file.name }}</p>
-            {% endfor %}
-            --------- files ------------
-            {% for file in files %}
-                <p> {{ file.name }}</p>
-            {% endfor %}
+        {% if not error %}
+            {% if file %}
+                <br> Вот ссылка:
+                <a href={{ file.my_file.url }} download>{{ file.name }}</a>
+                </br>
+            {% else %}
+                {% if parent %}
+                    <a href=/{{ parent.full_path }}>..(updir)</a><br>
+                {% endif %}
+                --------- dirs -----------<br>
+                {% for dir in dirs %}
+                    <a href={{ dir.name }}>{{ dir.name }}</a><br>
+                {% endfor %}
+                --------- files ------------<br>
+                {% for file in files %}
+                     <a href={{ file.my_file.url }} download={{ file.name }}>{{ file.name }}</a> <br>
+                {% endfor %}
+            {% endif %}
+        {% else %}
+            <p>{{  error }}</p>
+        {% endif %}
         </div>
         
     </div>

@@ -74,6 +74,7 @@ TEMPLATE_CONTEXT_PROCESSORS = (
 # auth and allauth settings
 LOGIN_REDIRECT_URL = '/'
 SOCIALACCOUNT_QUERY_EMAIL = True
+ACCOUNT_USERNAME_BLACKLIST = ['admin', 'accounts']
 
 #This will avoid the need for an SMTP server as e-mails
 # will be printed to the console. For more information, please refer to:
