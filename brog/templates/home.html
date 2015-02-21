@@ -5,7 +5,7 @@
 
 {% block content %}
 
-<div class="page-header">
+<div class="page-header" xmlns="http://www.w3.org/1999/html">
   <h1>Дисковое пространство </br><small>Суммарный объем файлов на диске: 500 mb</small></h1>
 </div>
       
@@ -75,6 +75,18 @@
        
        
         <div class="col-xs-9 col-centered">
+        <form action="/create/dir/path={{ request.path }}" method="post">
+            {% csrf_token %}
+            {{ CreateDirForm }}
+            <input type="submit" value="Submit" />
+        </form>
+        </br>
+        <form action="/upload/file/path={{ request.path }}" enctype="multipart/form-data" method="post">
+            {% csrf_token %}
+            {{ UploadFileForm }}
+            <input type="submit" value="Submit" />
+        </form>
+       </br> </br>
         {% if not error %}
             {% if file %}
                 <br> Вот ссылка:

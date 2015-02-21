@@ -22,6 +22,8 @@ urlpatterns = patterns('',
     url(r'^$', index),
     url(r'^accounts/profile/$', TemplateView.as_view(template_name='profile.html')),
     url(r'^admin/', include(admin.site.urls)),
+    url(r'^create/dir/path=(?P<path>.+)$', DirCreate.as_view()),
+    url(r'^upload/file/path=(?P<path>.+)$', FileUpload.as_view()),
     url(r'(?P<path>.+)/$', FilesView.as_view()),
 
 )
