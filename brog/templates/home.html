@@ -28,7 +28,7 @@
                         <li>
                             <a href="/{{ node.full_path }}">
                                 {% if node == cur_dir %}
-                                   <strong>{{ node.name }}</strong>
+                                    <strong>{{ node.name }}</strong>
                                 {% else %}
                                     {{ node.name }}
                                 {% endif %}
@@ -51,7 +51,7 @@
                     </br>
                 {% else %}
                     {% if parent %}
-                        <a href="/{{ parent.full_path }}">..(updir)</a><br>
+                        <a href="/{{ cur_dur.parent.full_path }}">..(updir)</a><br>
                     {% endif %}
                     --------- dirs -----------<br>
                     {% for dir in dirs %}
@@ -59,24 +59,26 @@
                     {% endfor %}
                     --------- files ------------<br>
                     {% for file in files %}
-                        <a href="{{ file.my_file.url }}" download={{ file.name }}>{{ file.name }}</a> <br>
+                        <a href="/{{ file.full_path }}">{{ file.name }}</a> <br>
                     {% endfor %}
                 {% endif %}
             </div>
 
             <div class="col-sm-3">
                 <p align="center">Действия</p>
-                <form action="/create/dir/path={{ request.path }}" method="post">
-                    {% csrf_token %}
-                    {{ CreateDirForm }}
-                    <input type="submit" value="Submit"/>
-                </form>
-                </br>
-                <form action="/upload/file/path={{ request.path }}" enctype="multipart/form-data" method="post">
-                    {% csrf_token %}
-                    {{ UploadFileForm }}
-                    <input type="submit" value="Submit"/>
-                </form>
+                {% if not file %}
+                    <form action="/create/dir/path={{ request.path }}" method="post">
+                        {% csrf_token %}
+                        {{ CreateDirForm }}
+                        <input type="submit" value="Submit"/>
+                    </form>
+                    </br>
+                    <form action="/upload/file/path={{ request.path }}" enctype="multipart/form-data" method="post">
+                        {% csrf_token %}
+                        {{ UploadFileForm }}
+                        <input type="submit" value="Submit"/>
+                    </form>
+                {% endif %}
             </div>
         </div>
     {% endif %}
