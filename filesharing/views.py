@@ -8,8 +8,9 @@ from filesharing.forms import *
 from django.views.generic import DetailView, TemplateView
 from django.views.generic.edit import FormMixin, CreateView, UpdateView, DeleteView
 
+
 class IndexView(TemplateView):
-    template_name  = 'index.html'
+    template_name = 'index.html'
 
 
 # TODO: проверка пользователя, корректного именти и бла бла
@@ -33,6 +34,7 @@ class FileUpload(CreateView):
         instance.save()
         return HttpResponseRedirect(self.success_url)
 
+# TODO: разобраться, что происходит в случае ошибки и как это обрабатывать
 class DirCreate(CreateView):
     form_class = CreateDirectoryForm
     template_name = 'home.html'
@@ -55,6 +57,7 @@ class DirCreate(CreateView):
         # А теперь можно сохранить в базу
         instance.save()
         return HttpResponseRedirect(self.success_url)
+
 
 #TODO: переделать
 class FilesView(FormMixin, TemplateView):
@@ -81,12 +84,25 @@ class FilesView(FormMixin, TemplateView):
     def get_context_data(self, **kwargs):
         path = self.kwargs['path']
         context = super(FilesView, self).get_context_data(**kwargs)
-        context['CreateDirForm'] = self.get_form(CreateDirectoryForm)
-        context['UploadFileForm'] = self.get_form(UploadFileForm)
         self.cur_dir = Directory.objects.get_by_full_path(path)
         if self.cur_dir:
+            # если по запрошенному пути найдена папка
+
+            # список файлов и папок в текущей директории
             context.update(self.list_dir())
+
+            # папки, составляющие полный пусть (для СТРОКИ навигации)
+            context['path_dirs'] = self.cur_dir.get_ancestors(
+                include_self=True)
+
+            # дерево папок пользователя - для ДЕРЕВА навигации
+            context['user_dirs'] = self.request.user.home_directory.get_descendants(include_self=True)
+            context['cur_dir'] = self.cur_dir
+
+            context['CreateDirForm'] = self.get_form(CreateDirectoryForm)
+            context['UploadFileForm'] = self.get_form(UploadFileForm)
         else:
+            # если по запрошенному пати найден файл
             self.cur_file = File.objects.get_by_full_path(path)
             if self.cur_file:
                 # TODO: что же делать, если запрошен файл? redirect?

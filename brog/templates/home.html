@@ -1,119 +1,83 @@
 {% extends "base.html" %}
-
-{% block title %}Домашняя директория{% endblock %}
+{% block title %}Просмотр папок{% endblock %}
 
 
 {% block content %}
-
-<div class="page-header" xmlns="http://www.w3.org/1999/html">
-  <h1>Дисковое пространство </br><small>Суммарный объем файлов на диске: 500 mb</small></h1>
-</div>
-      
-      
-<ol class="breadcrumb">
-  <li><a href="#">Home</a></li>
-  <li><a href="#">Мои файлы</a></li>
-  <li><a href="#">Фотографии</a></li>
-  <li class="active">Прогулка по лесу</li>
-</ol>
-
-
-
-<div class="container">
-    <div class="row row-centered">
-        <div class="col-xs-3 ">
-                        <div class="tree well">
-                            <ul>
-                                <li>
-                                    <span><i class="icon-folder-open"></i> Мои файлы </span> 
-                                    <ul>
-                                        <li>
-                                        	<span><i class="icon-folder-open"></i> Фотографии </span> 
-                                            <ul>
-                                                <li>
-	                                                <span><i class="icon-folder-open"></i> Прогулка </span> 
-                                                </li>
-                                            </ul>
-                                        </li>
-                                        <li>
-                                        	<span><i class="icon-folder-close"></i> Документы </span> 
-                                            <ul>
-                                                <li style="display: none;">
-	                                                <span><i class="icon-folder-close"></i> Работа </span> 
-                                                </li>
-                                                <li style="display: none;">
-                                                	<span><i class="icon-folder-close"></i> Семейные </span> 
-                                                    <ul>
-                                                        <li style="display: none;">
-	                                                        <span><i class="icon-folder-close"></i>  Мои </span> 
-		                                                    
-                                                        </li>
-                                                        <li style="display: none;">
-	                                                        <span><i class="icon-folder-close"></i> Жена </span> 
-                                                        </li>
-                                                        <li style="display: none;">
-	                                                        <span><i class="icon-folder-close"></i> Сын </span> 
-                                                        </li>
-                                                    </ul>
-                                                </li>
-                                                <li style="display: none;">
-	                                                <span><i class="icon-folder-close"></i> Недвижимость </span> 
-                                                </li>
-                                            </ul>
-                                        </li>
-                                    </ul>
-                                </li>
-                                
-                            </ul>
-                        </div>
-
-                        
-
+    {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
         </div>
-       
-       
-       
-       
-        <div class="col-xs-9 col-centered">
-        <form action="/create/dir/path={{ request.path }}" method="post">
-            {% csrf_token %}
-            {{ CreateDirForm }}
-            <input type="submit" value="Submit" />
-        </form>
-        </br>
-        <form action="/upload/file/path={{ request.path }}" enctype="multipart/form-data" method="post">
-            {% csrf_token %}
-            {{ UploadFileForm }}
-            <input type="submit" value="Submit" />
-        </form>
-       </br> </br>
-        {% if not error %}
-            {% if file %}
-                <br> Вот ссылка:
-                <a href={{ file.my_file.url }} download>{{ file.name }}</a>
-                </br>
-            {% else %}
-                {% if parent %}
-                    <a href=/{{ parent.full_path }}>..(updir)</a><br>
+    {% else %}
+
+        <ol class="breadcrumb">
+            {% for dir in path_dirs %}
+                {% if not forloop.last %}
+                    <li><a href="/{{ dir.full_path }}">{{ dir.name }}</a></li>
+                {% else %}
+                    <li class="active">{{ dir.name }}</li>
                 {% endif %}
-                --------- dirs -----------<br>
-                {% for dir in dirs %}
-                    <a href={{ dir.name }}>{{ dir.name }}</a><br>
-                {% endfor %}
-                --------- files ------------<br>
-                {% for file in files %}
-                     <a href={{ file.my_file.url }} download={{ file.name }}>{{ file.name }}</a> <br>
-                {% endfor %}
-            {% endif %}
-        {% else %}
-            <p>{{  error }}</p>
-        {% endif %}
+            {% endfor %}
+        </ol>
+
+        <div class="row">
+            <div class="col-sm-2">
+                <p align="center">Дерево каталогов</p>
+                {% load mptt_tags %}
+                <ul>
+                    {% recursetree user_dirs %}
+                        <li>
+                            <a href="/{{ node.full_path }}">
+                                {% if node == cur_dir %}
+                                   <strong>{{ node.name }}</strong>
+                                {% else %}
+                                    {{ node.name }}
+                                {% endif %}
+                            </a>
+                            {% if not node.is_leaf_node and cur_dir in node.get_descendants %}
+                                <ul class="children">
+                                    {{ children }}
+                                </ul>
+                            {% endif %}
+                        </li>
+                    {% endrecursetree %}
+                </ul>
+            </div>
+
+            <div class="col-sm-7">
+                <p align="center">Список файлов</p>
+                {% if file %}
+                    <br> Вот ссылка:
+                    <a href={{ file.my_file.url }} download>{{ file.name }}</a>
+                    </br>
+                {% else %}
+                    {% if parent %}
+                        <a href="/{{ parent.full_path }}">..(updir)</a><br>
+                    {% endif %}
+                    --------- dirs -----------<br>
+                    {% for dir in dirs %}
+                        <a href="{{ dir.name }}">{{ dir.name }}</a><br>
+                    {% endfor %}
+                    --------- files ------------<br>
+                    {% for file in files %}
+                        <a href="{{ file.my_file.url }}" download={{ file.name }}>{{ file.name }}</a> <br>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <div class="col-sm-3">
+                <p align="center">Действия</p>
+                <form action="/create/dir/path={{ request.path }}" method="post">
+                    {% csrf_token %}
+                    {{ CreateDirForm }}
+                    <input type="submit" value="Submit"/>
+                </form>
+                </br>
+                <form action="/upload/file/path={{ request.path }}" enctype="multipart/form-data" method="post">
+                    {% csrf_token %}
+                    {{ UploadFileForm }}
+                    <input type="submit" value="Submit"/>
+                </form>
+            </div>
         </div>
-        
-    </div>
-</div>
-
-
-
-
+    {% endif %}
 {% endblock %}
