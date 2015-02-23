@@ -10,12 +10,13 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.manager import Manager
 from django.db.utils import IntegrityError
 from django.db.models.signals import pre_save
+from django.core.exceptions import ValidationError
 
 
 class User(AbstractUser):
     @property
     def home_directory(self):
-        return Directory.objects.root_nodes().filter(owner=self.user)
+        return Directory.objects.root_nodes().get(owner=self)
 
 
 # создание домашней папки для каждого пользователя
@@ -59,10 +60,16 @@ class DirectoryManager(TreeManager):
                 return None
         return parent
 
+# TODO: переделать
+def name_valid(name):
+    if '/' in name:
+        raise ValidationError("Запрещено использовать такие знаки")
+
 
 class Directory(MPTTModel):
     objects = DirectoryManager()
-    name = models.CharField(max_length=256, verbose_name="Имя")
+    name = models.CharField(max_length=256, validators=[name_valid],
+                            verbose_name="Имя")
     owner = models.ForeignKey(User, related_name="user_owner",
                               verbose_name="Владелец")
     parent = TreeForeignKey('self', null=True, blank=True,

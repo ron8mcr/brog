@@ -11,3 +11,8 @@ class UploadFileForm(forms.ModelForm):
     class Meta(object):
         model = File
         fields = ['my_file']
+
+class UpdateDirectoryNameForm(forms.ModelForm):
+    class Meta(object):
+        model = Directory
+        fields = ['name']

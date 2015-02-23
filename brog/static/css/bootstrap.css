@@ -6583,15 +6583,9 @@ button.close {
 
 
 
-
-
-
-
-
-
 .tree {
     min-height:20px;
-    margin-bottom:20px;
+    margin-bottom:10px;
 }
 .tree ul:first-child {
 
