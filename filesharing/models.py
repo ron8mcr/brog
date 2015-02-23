@@ -60,6 +60,7 @@ class DirectoryManager(TreeManager):
                 return None
         return parent
 
+
 # TODO: переделать
 def name_valid(name):
     if '/' in name:

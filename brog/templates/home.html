@@ -3,266 +3,116 @@
 
 
 {% block content %}
-    {% if error %}
-        <div class="alert alert-danger" role="alert">
-            {{ error }}
-        </div>
-    {% else %}
+{% if messages %}
+    {% for message in messages %}
+        {% if message.tags == "error" %}
+            <div class="alert alert-danger" role="alert">
+                {{ message }}
+            </div>
+        {% else %}
+            <div class="alert alert-{{ message.tags }}" role="alert">
+                {{ message }}
+            </div>
+        {% endif %}
+    {% endfor %}
+{% endif %}
 
-<<<<<<< HEAD
-    {% if messages %}
-        {% for message in messages %}
-            {% if message.tags == "error" %}
-                <div class="alert alert-danger" role="alert">
-                    {{ message }}
-                </div>
+{% if error %}
+    <div class="alert alert-danger" role="alert">
+        {{ error }}
+    </div>
+{% else %}
+
+    <ol class="breadcrumb">
+        {% for dir in path_dirs %}
+            {% if not forloop.last %}
+                <li><a href="/{{ dir.full_path }}">{{ dir.name }}</a></li>
             {% else %}
-                <div class="alert alert-{{ message.tags }}" role="alert">
-                    {{ message }}
-                </div>
+                <li class="active">{{ dir.name }}</li>
             {% endif %}
         {% endfor %}
+    </ol>
 
-    {% else %}
-
-=======
->>>>>>> 8c7bf9f0a841f9d45ca0d996988cf570f622a26e
-        <ol class="breadcrumb">
-            {% for dir in path_dirs %}
-                {% if not forloop.last %}
-                    <li><a href="/{{ dir.full_path }}">{{ dir.name }}</a></li>
-                {% else %}
-                    <li class="active">{{ dir.name }}</li>
-                {% endif %}
-            {% endfor %}
-        </ol>
-<<<<<<< HEAD
-
-        <div class="row">
-            <div class="col-sm-2">
-                <p align="center">Дерево каталогов</p>
-                {% load mptt_tags %}
-                <ul>
-                    {% recursetree user_dirs %}
-                        <li>
-                            <a href="/{{ node.full_path }}">
-                                {% if node == cur_dir %}
-                                    <strong>{{ node.name }}</strong>
-                                {% else %}
-                                    {{ node.name }}
-                                {% endif %}
-                            </a>
-                            {% if not node.is_leaf_node and cur_dir in node.get_descendants %}
-                                <ul class="children">
-                                    {{ children }}
-                                </ul>
+    <div class="row">
+        <div class="col-sm-2">
+            <p align="center">Дерево каталогов</p>
+            {% load mptt_tags %}
+            <ul>
+                {% recursetree user_dirs %}
+                    <li>
+                        <a href="/{{ node.full_path }}">
+                            {% if node == cur_dir %}
+                                <strong>{{ node.name }}</strong>
+                            {% else %}
+                                {{ node.name }}
                             {% endif %}
-                        </li>
-                    {% endrecursetree %}
-                </ul>
-            </div>
-
-            <div class="col-sm-7">
-                <p align="center">Список файлов</p>
-                {% if file %}
-                    <br> Вот ссылка:
-                    <a href={{ file.my_file.url }} download>{{ file.name }}</a>
-                    </br>
-                {% else %}
-                    {% if parent %}
-                        <a href="/{{ cur_dur.parent.full_path }}">..(updir)</a><br>
-                    {% endif %}
-                    --------- dirs -----------<br>
-                    {% for dir in dirs %}
-                        <a href="{{ dir.name }}">{{ dir.name }}</a><br>
-                    {% endfor %}
-                    --------- files ------------<br>
-                    {% for file in files %}
-                        <a href="/{{ file.full_path }}">{{ file.name }}</a> <br>
-                    {% endfor %}
-                {% endif %}
-            </div>
-
-            <div class="col-sm-3">
-                <p align="center">Действия</p>
-                {% if not file %}
-                    <form action="/create/dir/path={{ request.path }}" method="post">
-                        {% csrf_token %}
-                        {{ CreateDirForm }}
-                        <input type="submit" value="Создать директорию"/>
-                    </form>
-                    </br>
-                    <form action="/upload/file/path={{ request.path }}" enctype="multipart/form-data" method="post">
-                        {% csrf_token %}
-                        {{ UploadFileForm }}
-                        <input type="submit" value="Загрузить файл"/>
-                    </form>
-                    </br>
-                    <form action="/update/dir/path={{ request.path }}" method="post">
-                        {% csrf_token %}
-                        {% for dir in path_dirs %}
-                            {% if forloop.last %}
-                               <input id="id_name" maxlength="256" name="name" type="text" value="{{ dir.name }}">
-                            {% endif %}
-                        {% endfor %}
-                        <!--{{ UpdateDirectoryName }}-->
-                        <input type="submit" value="Переименовать текущую директорию"/>
-                    </form>
-                    </br>
-
-                    <form action="/delete/dir/path={{ request.path }}"  method="post">
-                        {% csrf_token %}
-                        <input type="submit" value="Удалить текущую директорию"/>
-                    </form>
-                    </br>
-
-                {% endif %}
-            </div>
-        </div>
-    {% endif %}
-{% endblock %}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<!--
-<div class="tree well">
-                            <ul>
-                                <li>
-                                    <span><i class="icon-folder-open"></i> Мои файлы </span>
-                                    <ul>
-                                        <li>
-                                        	<span><i class="icon-folder-open"></i> Фотографии </span>
-                                            <ul>
-                                                <li>
-	                                                <span><i class="icon-folder-open"></i> Прогулка </span>
-                                                </li>
-                                            </ul>
-                                        </li>
-                                        <li>
-                                        	<span><i class="icon-folder-close"></i> Документы </span>
-                                            <ul>
-                                                <li style="display: none;">
-	                                                <span><i class="icon-folder-close"></i> Работа </span>
-                                                </li>
-                                                <li style="display: none;">
-                                                	<span><i class="icon-folder-close"></i> Семейные </span>
-                                                    <ul>
-                                                        <li style="display: none;">
-	                                                        <span><i class="icon-folder-close"></i>  Мои </span>
-
-                                                        </li>
-                                                        <li style="display: none;">
-	                                                        <span><i class="icon-folder-close"></i> Жена </span>
-                                                        </li>
-                                                        <li style="display: none;">
-	                                                        <span><i class="icon-folder-close"></i> Сын </span>
-                                                        </li>
-                                                    </ul>
-                                                </li>
-                                                <li style="display: none;">
-	                                                <span><i class="icon-folder-close"></i> Недвижимость </span>
-                                                </li>
-                                            </ul>
-                                        </li>
-                                    </ul>
-                                </li>
-
+                        </a>
+                        {% if not node.is_leaf_node and cur_dir in node.get_descendants %}
+                            <ul class="children">
+                                {{ children }}
                             </ul>
-                        </div>
--->
-=======
-
-        <div class="row">
-            <div class="col-sm-2">
-                <p align="center">Дерево каталогов</p>
-                {% load mptt_tags %}
-                <ul>
-                    {% recursetree user_dirs %}
-                        <li>
-                            <a href="/{{ node.full_path }}">
-                                {% if node == cur_dir %}
-                                    <strong>{{ node.name }}</strong>
-                                {% else %}
-                                    {{ node.name }}
-                                {% endif %}
-                            </a>
-                            {% if not node.is_leaf_node and cur_dir in node.get_descendants %}
-                                <ul class="children">
-                                    {{ children }}
-                                </ul>
-                            {% endif %}
-                        </li>
-                    {% endrecursetree %}
-                </ul>
-            </div>
-
-            <div class="col-sm-7">
-                <p align="center">Список файлов</p>
-                {% if file %}
-                    <br> Вот ссылка:
-                    <a href={{ file.my_file.url }} download>{{ file.name }}</a>
-                    </br>
-                {% else %}
-                    {% if parent %}
-                        <a href="/{{ cur_dur.parent.full_path }}">..(updir)</a><br>
-                    {% endif %}
-                    --------- dirs -----------<br>
-                    {% for dir in dirs %}
-                        <a href="{{ dir.name }}">{{ dir.name }}</a><br>
-                    {% endfor %}
-                    --------- files ------------<br>
-                    {% for file in files %}
-                        <a href="/{{ file.full_path }}">{{ file.name }}</a> <br>
-                    {% endfor %}
-                {% endif %}
-            </div>
-
-            <div class="col-sm-3">
-                <p align="center">Действия</p>
-                {% if not file %}
-                    <form action="/create/dir/path={{ request.path }}" method="post">
-                        {% csrf_token %}
-                        {{ CreateDirForm }}
-                        <input type="submit" value="Submit"/>
-                    </form>
-                    </br>
-                    <form action="/upload/file/path={{ request.path }}" enctype="multipart/form-data" method="post">
-                        {% csrf_token %}
-                        {{ UploadFileForm }}
-                        <input type="submit" value="Submit"/>
-                    </form>
-                {% endif %}
-            </div>
+                        {% endif %}
+                    </li>
+                {% endrecursetree %}
+            </ul>
         </div>
-    {% endif %}
+
+        <div class="col-sm-7">
+            <p align="center">Список файлов</p>
+            {% if file %}
+                <br> Вот ссылка:
+                <a href={{ file.my_file.url }} download>{{ file.name }}</a>
+                </br>
+            {% else %}
+                {% if parent %}
+                    <a href="/{{ cur_dur.parent.full_path }}">..(updir)</a><br>
+                {% endif %}
+                --------- dirs -----------<br>
+                {% for dir in dirs %}
+                    <a href="{{ dir.name }}">{{ dir.name }}</a><br>
+                {% endfor %}
+                --------- files ------------<br>
+                {% for file in files %}
+                    <a href="/{{ file.full_path }}">{{ file.name }}</a> <br>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <div class="col-sm-3">
+            <p align="center">Действия</p>
+            {% if not file %}
+                <form action="/create/dir/path={{ request.path }}" method="post">
+                    {% csrf_token %}
+                    {{ CreateDirForm }}
+                    <input type="submit" value="Создать директорию"/>
+                </form>
+                </br>
+                <form action="/upload/file/path={{ request.path }}" enctype="multipart/form-data" method="post">
+                    {% csrf_token %}
+                    {{ UploadFileForm }}
+                    <input type="submit" value="Загрузить файл"/>
+                </form>
+                </br>
+                <form action="/update/dir/path={{ request.path }}" method="post">
+                    {% csrf_token %}
+                    {% for dir in path_dirs %}
+                        {% if forloop.last %}
+                            <input id="id_name" maxlength="256" name="name" type="text" value="{{ dir.name }}">
+                        {% endif %}
+                    {% endfor %}
+                    <!--{{ UpdateDirectoryName }}-->
+                    <input type="submit" value="Переименовать текущую директорию"/>
+                </form>
+                </br>
+
+                <form action="/delete/dir/path={{ request.path }}" method="post">
+                    {% csrf_token %}
+                    <input type="submit" value="Удалить текущую директорию"/>
+                </form>
+                </br>
+
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
 {% endblock %}
->>>>>>> 8c7bf9f0a841f9d45ca0d996988cf570f622a26e

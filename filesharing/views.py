@@ -10,16 +10,11 @@ from filesharing.forms import *
 from django.views.generic import DetailView, TemplateView
 from django.views.generic.edit import FormMixin, CreateView, UpdateView, DeleteView
 
-
-<<<<<<< HEAD
-
 #переопределячем значение тэга сообщения под стиль бутстрапа, чтобы вместо error стал danger
 from django.contrib.messages import constants as message_constants
 MESSAGE_TAGS = {message_constants.ERROR: 'danger',}
 
 
-=======
->>>>>>> 8c7bf9f0a841f9d45ca0d996988cf570f622a26e
 class IndexView(TemplateView):
     template_name = 'index.html'
 
@@ -42,10 +37,11 @@ class FileUpload(CreateView):
         if instance.parent.has_access(self.request.user):
             # А теперь можно сохранить в базу
             instance.save()
-            messages.add_message(self.request, messages.SUCCESS, 'Файл "' + instance.name.encode('utf-8') + '" был успешно загружен' )
+            messages.add_message(self.request, messages.SUCCESS, 'Файл "' + instance.name + '" был успешно загружен' )
         else:
             messages.add_message(self.request, messages.ERROR, 'Вы не имеете право загружать файлы в данную директорию' )
         return HttpResponseRedirect(self.success_url)
+
 
 # TODO: разобраться, что происходит в случае ошибки и как это обрабатывать
 class DirCreate(CreateView):
@@ -68,14 +64,13 @@ class DirCreate(CreateView):
 
             # А теперь можно сохранить в базу
             instance.save()
-            messages.add_message(self.request, messages.SUCCESS, 'Директория "' + instance.name.encode('utf-8') + '" успешно создана' )
+            messages.add_message(self.request, messages.SUCCESS, 'Директория "' + instance.name + '" успешно создана' )
         else:
             messages.add_message(self.request, messages.ERROR, 'Вы не имеете право создавать директории в этой папке' )
 
         return HttpResponseRedirect(self.success_url)
 
 
-<<<<<<< HEAD
 class DirUpdate(UpdateView):
     form_class = UpdateDirectoryNameForm
     model = Directory
@@ -101,7 +96,7 @@ class DirUpdate(UpdateView):
             dir_before = self.get_object()
             # А теперь можно сохранить в базу
             instance.save()
-            messages.add_message(self.request, messages.SUCCESS, 'Директория "' + dir_before.name.encode('utf-8') + '" успешно переименована в "' + instance.name.encode('utf-8') + '"')
+            messages.add_message(self.request, messages.SUCCESS, 'Директория "' + dir_before.name + '" успешно переименована в "' + instance.name + '"')
         else:
             messages.add_message(self.request, messages.ERROR, 'Вы не имеете право изменять данную директорию' )
 
@@ -131,8 +126,7 @@ class DirDelete(DeleteView):
 
         return HttpResponseRedirect(dirs_path)
 
-=======
->>>>>>> 8c7bf9f0a841f9d45ca0d996988cf570f622a26e
+
 class FilesView(FormMixin, TemplateView):
     template_name = 'home.html'
 
@@ -206,15 +200,12 @@ class FilesView(FormMixin, TemplateView):
 
             # информация для навигации
             context.update(self.navigation_inform())
-<<<<<<< HEAD
             context['CreateDirForm'] = self.get_form(CreateDirectoryForm)
             context['UploadFileForm'] = self.get_form(UploadFileForm)
             context['UpdateDirectoryNameForm'] = self.get_form(UpdateDirectoryNameForm)
-=======
 
             context['CreateDirForm'] = self.get_form(CreateDirectoryForm)
             context['UploadFileForm'] = self.get_form(UploadFileForm)
->>>>>>> 8c7bf9f0a841f9d45ca0d996988cf570f622a26e
             # TODO  формы удаления и переименования директории
         else:
             # если по запрошенному пати найден файл
@@ -222,13 +213,12 @@ class FilesView(FormMixin, TemplateView):
             if self.cur_file:
                 context.update(self.list_file())
                 context.update(self.navigation_inform())
-<<<<<<< HEAD
+
                 # TODO: формы другие должны быть (переименования, удаления)
                 context['CreateDirForm'] = self.get_form(CreateDirectoryForm)
                 context['UploadFileForm'] = self.get_form(UploadFileForm)
                 context['UpdateDirectoryNameForm'] = self.get_form(UpdateDirectoryNameForm)
-=======
->>>>>>> 8c7bf9f0a841f9d45ca0d996988cf570f622a26e
+
 
                 # TODO: формы другие должны быть (переименования, удаления)
                 context['CreateDirForm'] = self.get_form(CreateDirectoryForm)

@@ -6,9 +6,9 @@ SITE_ID = 1
 DATABASES = {
     'default': {
     'ENGINE': 'django.db.backends.postgresql_psycopg2',
-    'NAME': 'brog',
-    'USER': 'postgres',
-    'PASSWORD': 'password',
+    'NAME': 'brogdb',
+    'USER': 'broguser',
+    'PASSWORD': 'brogpass',
     'HOST': '', # Set to empty string for localhost.
     'PORT': '', # Set to empty string for default.
     }
