@@ -92,6 +92,21 @@ class Directory(MPTTModel):
         return os.path.join(*[i.name for i in
                               self.get_ancestors(include_self=True)])
 
+    def clean(self):
+        try:
+            Directory.objects.get(parent=self.parent, name=self.name)
+        except Directory.DoesNotExist as err:
+            pass
+        else:
+            raise ValidationError("Такая директория уже есть")
+
+        try:
+            File.objects.get(parent=self.parent, name=self.name)
+        except File.DoesNotExist as err:
+            pass
+        else:
+            raise ValidationError("Есть файл с таким именем")
+
     # TODO: тщательно протестировать
     # имеет ли пользователь доступ к папке
     def has_access(self, user):

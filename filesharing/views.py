@@ -48,35 +48,41 @@ class FileUpload(CreateView):
 class DirCreate(CreateView):
     form_class = CreateDirectoryForm
 
-    def get_initial(self):
-        return {
-            'owner': self.request.user,
-            'parent': Directory.objects.get_by_full_path(self.kwargs['path'])
-        }
-
-    def form_valid(self, form):
-        # получаем объект на основе данных формы
-        instance = form.save(commit=False)
+    def post(self, request, *args, **kwargs):
+        """
+        Handles POST requests, instantiating a form instance with the passed
+        POST variables and then checked for validity.
+        """
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
 
         # заполняем неполученные поля
-        parent_path = self.kwargs['path']
-        self.success_url = parent_path
-        instance.parent = Directory.objects.get_by_full_path(parent_path)
-        instance.owner = self.request.user
+        self.parent_path = self.kwargs['path']
+        form.instance.parent = Directory.objects.get_by_full_path(self.parent_path)
+        form.instance.owner = self.request.user
 
-        if instance.parent.has_access(self.request.user):
-            # назначаем владельца
-            instance.owner = self.request.user
-
-            # А теперь можно сохранить в базу
-            instance.save()
-            messages.add_message(self.request, messages.SUCCESS, 'Директория "' + instance.name + '" успешно создана' )
+        if form.is_valid():
+            return self.form_valid(form)
         else:
-            messages.add_message(self.request, messages.ERROR, 'Вы не имеете право создавать директории в этой папке' )
+            return self.form_invalid(form)
+
+    def form_valid(self, form):
+        self.success_url = self.parent_path
+
+        if form.instance.parent.has_access(self.request.user):
+            # А теперь можно сохранить в базу
+            form.instance.save()
+            messages.add_message(self.request, messages.SUCCESS,
+                    'Директория "' + form.instance.name + '" успешно создана' )
+        else:
+            messages.add_message(self.request, messages.ERROR,
+                    'Вы не имеете право создавать директории в этой папке' )
         return super(DirCreate, self).form_valid(form)
 
     def form_invalid(self, form):
-        return HttpResponse("form error")
+        for err in form.errors['__all__']:
+            messages.add_message(self.request, messages.ERROR, err)
+        return HttpResponseRedirect(self.parent_path)
 
 
 class DirUpdate(UpdateView):
