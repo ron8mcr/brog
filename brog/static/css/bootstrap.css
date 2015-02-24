@@ -6578,7 +6578,38 @@ button.close {
     margin: 0 auto; /* the bottom margin is the negative value of the footer's height */
 }
 
+ /*  правая панель управления файлами  */
+ .r_panel_btn{
+                width: 100% !important;
+            }
+            input[type="text"] {
+                width: 100%  !important;
+            }
 
+ /*  отображение директорий и файлов  */
+ .dirs{
+                text-align: center;
+                margin-top: 15px;
+                padding-top: 12px;
+            }
+            .dirs:hover{
+                background-color: #eee;
+            }
+            .dirs span{
+                margin-right: 10px;
+            }
+            .dirs p.name{
+                color: #337ab7;
+            }
+            a.list{
+                color: #626262;
+            }
+            a.list:hover{
+                text-decoration: underline;
+            }
+            span.glyphicon {
+                font-size: 25px;
+            }
 
 
 
@@ -6589,7 +6620,7 @@ button.close {
 }
 .tree ul:first-child {
 
-    margin-left: -60px;
+    margin-left: -40px;
 }
 .tree li {
     list-style-type:none;

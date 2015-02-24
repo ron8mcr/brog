@@ -60,4 +60,3 @@ target/
 .idea/
 
 media/
-*_local.py
