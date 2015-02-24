@@ -90,8 +90,8 @@ class Directory(MPTTModel):
 
     @property
     def full_path(self):
-        return os.path.join(*[i.name for i in
-                              self.get_ancestors(include_self=True)])
+        return "/{}".format(os.path.join(*[i.name for i in
+                              self.get_ancestors(include_self=True)]))
 
     # TODO: тщательно протестировать
     # имеет ли пользователь доступ к папке
@@ -155,6 +155,7 @@ class File(models.Model):
         return self.parent.has_access(user)
 
     class Meta():
+        ordering = ['name']
         verbose_name = "Файл"
         verbose_name_plural = "Файлы"
         unique_together = ("parent", "name")

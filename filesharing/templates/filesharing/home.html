@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Просмотр папок{% endblock %}
+{% load staticfiles %}
+
+{% block content %}
+    {% if messages %}
+        {% for message in messages %}
+            {% if message.tags == "error" %}
+                <div class="alert alert-danger" role="alert">
+                    {{ message }}
+                </div>
+            {% else %}
+                <div class="alert alert-{{ message.tags }}" role="alert">
+                    {{ message }}
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+    {% else %}
+        <ol class="breadcrumb">
+            {% for dir in path_dirs %}
+                {% if not forloop.last %}
+                    <li><a href="{{ dir.full_path }}">{{ dir.name }}</a></li>
+                {% else %}
+                    <li class="active">{{ dir.name }}</li>
+                {% endif %}
+            {% endfor %}
+        </ol>
+
+        <div class="row">
+            <div class="col-sm-2">
+                <p align="center">Дерево каталогов</p>
+                {% load mptt_tags %}
+                <ul>
+                    {% recursetree user_dirs %}
+                        <li>
+                            <a href="{{ node.full_path }}">
+                                {% if node == cur_dir %}
+                                    <strong>{{ node.name }}</strong>
+                                {% else %}
+                                    {{ node.name }}
+                                {% endif %}
+                            </a>
+                            {% if not node.is_leaf_node and cur_dir in node.get_descendants %}
+                                <ul class="children">
+                                    {{ children }}
+                                </ul>
+                            {% endif %}
+                        </li>
+                    {% endrecursetree %}
+                </ul>
+            </div>
+
+            <div class="col-sm-7">
+                {% if file %}
+                    <br> Вот ссылка:
+                    <a href={{ file.my_file.url }} download>{{ file.name }}</a>
+                    </br>
+                {% else %}
+                    {% comment %}
+                    <p align="center">Список файлов</p>
+                    {% if parent %}
+                        <a href="{{ cur_dur.parent.full_path }}">..(updir)</a><br>
+                    {% endif %}
+                    --------- dirs -----------<br>
+                    {% for dir in dirs %}
+                        <a href="{{ dir.name }}">{{ dir.name }}</a><br>
+                    {% endfor %}
+                    --------- files ------------<br>
+                    {% for file in files %}
+                        <a href="{{ file.full_path }}">{{ file.name }}</a> <br>
+                    {% endfor %}{% endcomment %}
+                    <table class="table table-bordered table-nonfluid" align="center">
+                        <tbody>
+                        {% if parent %}
+                            <tr>
+                                <td class="col-md-1 text-center">d</td>
+                                <td class="text-left"><a href="{{ parent.full_path }}">..(updir)</a></td>
+                            </tr>
+                        {% endif %}
+                        {% for dir in dirs %}
+                            <tr>
+                                <td class="col-md-1 text-center">d</td>
+                                <td class="text-left"><a href="{{ dir.full_path }}">{{ dir.name }}</a></td>
+                            </tr>
+                        {% endfor %}
+                        {% for file in files %}
+                            <tr>
+                                <td class="col-md-1 text-center">f</td>
+                                <td class="text-left"><a href="{{ file.full_path }}">{{ file.name }}</a> <br></td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            </div>
+
+            <div class="col-sm-3">
+                <p align="center">Действия</p>
+                {% if not file %}
+                    <form action="{{ request.path }}" method="post">
+                        {% csrf_token %}
+                        {{ CreateDirForm }}
+                        <input type="submit" name="create_dir" value="Создать директорию"/>
+                    </form>
+                    </br>
+                    <form action="{{ request.path }}" enctype="multipart/form-data" method="post">
+                        {% csrf_token %}
+                        {{ UploadFileForm }}
+                        <input type="submit" name="upload_file" value="Загрузить файл"/>
+                    </form>
+                    </br>
+                    <br>
+                    <form action="{{ request.path }}" method="post"">
+                    {% csrf_token %}
+                    <input id="id_name" maxlength="256" name="name" type="text" value="{{ cur_dir.name }}">
+                    <input type="submit" name="rename_dir" value="Переименовать текущую директорию"/>
+                    </form>
+                    </br>
+
+                    <form action="{{ request.path }}" method="post">
+                        {% csrf_token %}
+                        <input type="submit" name="delete_dir" value="Удалить текущую директорию"/>
+                    </form>
+                    </br>
+                {% else %}
+                    <form action="{{ request.path }}" method="post">
+                        {% csrf_token %}
+                        <input type="submit" name="delete_file" value="Удалить файл"/>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

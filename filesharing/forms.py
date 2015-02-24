@@ -19,3 +19,14 @@ class UpdateDirectoryNameForm(forms.ModelForm):
     class Meta(object):
         model = Directory
         fields = ['name']
+
+
+class DeleteDirectoryForm(forms.ModelForm):
+    class Meta():
+        model = Directory
+        fields = []
+
+class DeleteFileForm(forms.ModelForm):
+    class Meta():
+        model = File
+        fields = []
