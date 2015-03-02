@@ -60,15 +60,9 @@ class DirectoryManager(TreeManager):
                 return None
         return parent
 
-# TODO: переделать
-def name_valid(name):
-    if '/' in name:
-        raise ValidationError("Запрещено использовать такие знаки")
-
-
 class Directory(MPTTModel):
     objects = DirectoryManager()
-    name = models.CharField(max_length=256, validators=[name_valid],
+    name = models.CharField(max_length=256,
                             verbose_name="Имя")
     owner = models.ForeignKey(User, related_name="user_owner",
                               verbose_name="Владелец")
@@ -93,6 +87,10 @@ class Directory(MPTTModel):
                               self.get_ancestors(include_self=True)])
 
     def clean(self):
+        if not has_access(self.parent, self.owner):
+            raise ValidationError("Вы не имеете прав доступа к данной директории!")
+        if '/' in self.name:
+            raise ValidationError("Запрещено использовать такие знаки плохие в названии директории")
         try:
             Directory.objects.get(parent=self.parent, name=self.name)
         except Directory.DoesNotExist as err:
@@ -109,15 +107,7 @@ class Directory(MPTTModel):
 
     # TODO: тщательно протестировать
     # имеет ли пользователь доступ к папке
-    def has_access(self, user):
-        if self.access_type == AccessType.ALL:
-            return True
-        elif self.access_type == AccessType.NONE:
-            return user == self.owner
-        elif self.access_type == AccessType.GROUP:
-            return user in self.allowed_users
-        elif self.access_type == AccessType.REGISTERED:
-            return user.is_authenticated()
+
 
     class MPTTMeta:
         order_insertion_by = ['name']
@@ -165,14 +155,42 @@ class File(models.Model):
     def full_path(self):
         return os.path.join(self.parent.full_path, self.name)
 
-    def has_access(self, user):
-        return self.parent.has_access(user)
+    def clean(self):
+        name = os.path.basename(self.my_file.name)
+        if '/' in name:
+            raise ValidationError("Запрещено использовать такие знаки плохие в названии файла")
+        if not has_access(self.parent, self.owner):
+            raise ValidationError("Вы не имеете прав доступа к данной директории!")
+        try:
+            Directory.objects.get(parent=self.parent, name=name)
+        except Directory.DoesNotExist as err:
+            pass
+        else:
+            raise ValidationError("Директория с таким же именем уже есть")
+
+        try:
+            File.objects.get(parent=self.parent, name=name)
+        except File.DoesNotExist as err:
+            pass
+        else:
+            raise ValidationError("Есть файл с таким именем в данной директории")
 
     class Meta():
         verbose_name = "Файл"
         verbose_name_plural = "Файлы"
         unique_together = ("parent", "name")
 
+
+def has_access(dir, user):
+    if dir.access_type == AccessType.ALL:
+        return True
+    elif dir.access_type == AccessType.NONE:
+        return user == dir.owner
+    elif dir.access_type == AccessType.GROUP:
+        return user in dir.allowed_users
+    elif dir.access_type == AccessType.REGISTERED:
+        return user.is_authenticated()
+    return None
 
 # исключаем сохранение в одной директории
 # файлов и директорий с одинаковыми именами

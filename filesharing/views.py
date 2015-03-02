@@ -19,43 +19,12 @@ MESSAGE_TAGS = {message_constants.ERROR: 'danger',}
 class IndexView(TemplateView):
     template_name = 'index.html'
 
-
-# TODO: проверка пользователя, корректного именти и бла бла
-class FileUpload(CreateView):
-    form_class = UploadFileForm
-    template_name = 'home.html'
-    success_url = 'home'
-
-    def form_valid(self, form):
-        #получаем родительскую директорию
-        my_parent_path = self.kwargs['path']
-        self.success_url = my_parent_path
-        # говорим, чтобы view не торопилас сохранять директорию
-        instance = form.save(commit=False)
-        #получаем будущего родителя
-        instance.parent = Directory.objects.get_by_full_path(my_parent_path)
-
-        if instance.parent.has_access(self.request.user):
-            # А теперь можно сохранить в базу
-            instance.save()
-            messages.add_message(self.request, messages.SUCCESS, 'Файл "' + instance.name.encode('utf-8') + '" был успешно загружен' )
-        else:
-            messages.add_message(self.request, messages.ERROR, 'Вы не имеете право загружать файлы в данную директорию' )
-        return HttpResponseRedirect(self.success_url)
-
-
-# TODO: разобраться, что происходит в случае ошибки и как это обрабатывать
-class DirCreate(CreateView):
-    form_class = CreateDirectoryForm
+# TODO: так как для создания директории и загрузки файла по сути происходят одни и те же проверки, что мы можем использовать одну вьюху, определяя в урл класс формы
+class DirFileCreate(CreateView):
 
     def post(self, request, *args, **kwargs):
-        """
-        Handles POST requests, instantiating a form instance with the passed
-        POST variables and then checked for validity.
-        """
         form_class = self.get_form_class()
         form = self.get_form(form_class)
-
         # заполняем неполученные поля
         self.parent_path = self.kwargs['path']
         form.instance.parent = Directory.objects.get_by_full_path(self.parent_path)
@@ -68,16 +37,8 @@ class DirCreate(CreateView):
 
     def form_valid(self, form):
         self.success_url = self.parent_path
-
-        if form.instance.parent.has_access(self.request.user):
-            # А теперь можно сохранить в базу
-            form.instance.save()
-            messages.add_message(self.request, messages.SUCCESS,
-                    'Директория "' + form.instance.name + '" успешно создана' )
-        else:
-            messages.add_message(self.request, messages.ERROR,
-                    'Вы не имеете право создавать директории в этой папке' )
-        return super(DirCreate, self).form_valid(form)
+        form.instance.save()
+        return super(DirFileCreate, self).form_valid(form)
 
     def form_invalid(self, form):
         for err in form.errors['__all__']:
@@ -86,41 +47,28 @@ class DirCreate(CreateView):
 
 
 class DirUpdate(UpdateView):
-    form_class = UpdateDirectoryNameForm
-    model = Directory
-    template_name = 'home.html'
-    success_url = '/home/'
-    slug_field = 'name'
 
     def get_object(self):
         return Directory.objects.get_by_full_path(self.kwargs['path'])
 
+    def form_invalid(self, form):
+        for err in form.errors['__all__']:
+            messages.add_message(self.request, messages.ERROR, err)
+        return HttpResponseRedirect(self.kwargs['path'])
+
     def form_valid(self, form):
-        #получаем родительскую директорию
-        #my_parent_path = self.kwargs['path']
-
-        # говорим, чтобы view не торопилас сохранять директорию
         instance = form.save(commit=False)
-
-        if instance.has_access(self.request.user):
-            instance.owner = self.request.user
-            path = self.kwargs['path']
-            path = path.rstrip('/')
-            dirs_path, name = os.path.split(path)
-            dir_before = self.get_object()
-            # А теперь можно сохранить в базу
-            instance.save()
-            messages.add_message(self.request, messages.SUCCESS, 'Директория "' + dir_before.name.encode('utf-8') + '" успешно переименована в "' + instance.name.encode('utf-8') + '"')
-        else:
-            messages.add_message(self.request, messages.ERROR, 'Вы не имеете право изменять данную директорию' )
-
+        path = self.kwargs['path']
+        path = path.rstrip('/')
+        dirs_path, name = os.path.split(path)
+        dir_before = self.get_object()
+        instance.save()
+        messages.add_message(self.request, messages.SUCCESS, 'Директория "' + dir_before.name.encode('utf-8') + '" успешно переименована в "' + instance.name.encode('utf-8') + '"')
         return HttpResponseRedirect(dirs_path + '/' + instance.name)
 
 
 class DirDelete(DeleteView):
     model = Directory
-    template_name = 'home.html'
-    success_url = '/home/'
 
     def get_object(self):
         return Directory.objects.get_by_full_path(self.kwargs['path'])
@@ -128,7 +76,7 @@ class DirDelete(DeleteView):
     def delete(self, request, *args, **kwargs):
         object = self.get_object()
 
-        if object.has_access(self.request.user):
+        if has_access(object, self.request.user):
             object.delete()
             messages.add_message(self.request, messages.SUCCESS, 'Директория  была успешно удалена' )
         else:
@@ -137,7 +85,6 @@ class DirDelete(DeleteView):
         path = self.kwargs['path']
         path = path.rstrip('/')
         dirs_path, name = os.path.split(path)
-
         return HttpResponseRedirect(dirs_path)
 
 
@@ -165,7 +112,7 @@ class FilesView(FormMixin, TemplateView):
 
     def prepare_dir_context(self, context):
         # список файлов и папок в текущей директории
-        if not self.cur_dir.has_access(self.request.user):
+        if not has_access(self.cur_dir, self.request.user):
             context['critical_error'] = self.errors['ACCESS_DENIED']
         else:
             context['files'] = File.objects.filter(parent=self.cur_dir)
@@ -181,7 +128,7 @@ class FilesView(FormMixin, TemplateView):
 
     def prepare_file_context(self, context):
         self.cur_dir = self.cur_file.parent
-        if not self.cur_dir.has_access(self.request.user):
+        if not has_access(self.cur_dir, self.request.user):
             context['critical_error'] = self.errors['ACCESS_DENIED']
         else:
             context['file'] = self.cur_file
@@ -194,10 +141,6 @@ class FilesView(FormMixin, TemplateView):
                 UpdateDirectoryNameForm)
 
 
-            # TODO: формы другие должны быть (переименования, удаления)
-            context['CreateDirForm'] = self.get_form(CreateDirectoryForm)
-            context['UploadFileForm'] = self.get_form(UploadFileForm)
-
         return context
 
     def get_context_data(self, **kwargs):
@@ -208,13 +151,22 @@ class FilesView(FormMixin, TemplateView):
         self.cur_dir = Directory.objects.get_by_full_path(path)
         if self.cur_dir:
             # если по запрошенному пути найдена папка
-            context = self.prepare_dir_context(context)
+            context += self.prepare_dir_context(context)
         else:
-            # если по запрошенному пати найден файл
+            # если по запрошенному пути найден файл
             self.cur_file = File.objects.get_by_full_path(path)
             if self.cur_file:
-                context = self.prepare_file_context(context)
+                context += self.prepare_file_context(context)
             else:
                 context['critical_error'] = self.errors['BAD_PATH']
 
         return context
+
+    def render_to_response(self, context):
+        if 'file' in context:
+            response = HttpResponse()
+            response['Content-Disposition'] = "attachment; filename="+context['file'].name
+            response['X-Accel-Redirect'] = context['file'].my_file.url
+            return response
+
+        return super(FilesView, self).render_to_response(context)

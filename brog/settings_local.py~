@@ -26,7 +26,7 @@ DATABASES = {
 # }
 
 #MEDIA_ROOT = '/home/andrei/djcode/brog/media'
-MEDIA_ROOT = '/home/andrei/uwsgi-tmp/brog/brog/media'
+MEDIA_ROOT = '/home/andrei/prog/python/django/brog/media'
 MEDIA_URL = '/media/'
 
 STATICFILES_STORAGE = 'whitenoise.django.GzipManifestStaticFilesStorage'

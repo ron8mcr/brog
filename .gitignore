@@ -5,6 +5,10 @@ __pycache__/
 # C extensions
 *.so
 
+*.ini
+*.conf
+uwsgi_params*
+
 # Distribution / packaging
 .Python
 env/
