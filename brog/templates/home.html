@@ -20,10 +20,11 @@
             {% endif %}
         {% endfor %}
     {% endif %}
+
     <ol class="breadcrumb">
         {% for dir in path_dirs %}
             {% if not forloop.last %}
-                <li><a href="/{{ dir.full_path }}">{{ dir.name }}</a></li>
+                <li><a href="{{ dir.full_path }}">{{ dir.name }}</a></li>
             {% else %}
                 <li class="active">{{ dir.name }}</li>
             {% endif %}
@@ -37,7 +38,7 @@
                 <ul>
                     {% recursetree user_dirs %}
                         <li>
-                             <span><i class="icon-folder-open"></i><a href="/{{ node.full_path }}">
+                             <span><i class="icon-folder-open"></i><a href="{{ node.full_path }}">
                                  {% if node == cur_dir %}
                                      <strong>{{ node.name }}</strong>
                                  {% else %}
@@ -61,17 +62,13 @@
                 </br>
             {% else %}
                 {% if parent %}
-                    <a href="/{{ cur_dur.parent.full_path }}">..(updir)</a><br>
+                    <a href="{{ cur_dur.parent.full_path }}">..(updir)</a><br>
                 {% endif %}
-
-
-
                 <div class="row">
                     {% for dir in dirs %}
                         <a class="list" href="{{ dir.name }}">
                             <div class="col-sm-2 dirs">
                                 <p><span class="glyphicon glyphicon-folder-open" aria-hidden="true"></span></p>
-
                                 <p class="name">{{ dir.name }}</p>
                             </div>
                         </a>
@@ -79,10 +76,9 @@
                 </div>
                 <div class="row">
                     {% for file in files %}
-                        <a class="list" href="/{{ file.full_path }}">
+                        <a class="list" href="{{ file.full_path }}">
                             <div class="col-sm-2 dirs">
                                 <p><span class="glyphicon glyphicon-file" aria-hidden="true"></span></p>
-
                                 <p class="name">{{ file.name }}</p>
                             </div>
                         </a>

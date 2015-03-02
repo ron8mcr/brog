@@ -76,21 +76,21 @@ LOGIN_REDIRECT_URL = '/'
 SOCIALACCOUNT_QUERY_EMAIL = True
 ACCOUNT_USERNAME_BLACKLIST = ['admin', 'accounts']
 
-#This will avoid the need for an SMTP server as e-mails
+# This will avoid the need for an SMTP server as e-mails
 # will be printed to the console. For more information, please refer to:
-#https://docs.djangoproject.com/en/dev/ref/settings/#email-host
+# https://docs.djangoproject.com/en/dev/ref/settings/#email-host
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 
 SOCIALACCOUNT_PROVIDERS = \
-{
-    'vk':
+    {
+        'vk':
         {
             'SCOPE': ['email'],
             'AUTH_PARAMS': {'auth_type': 'reauthenticate'},
             'METHOD': 'oauth2',
         },
-}
+    }
 
 
 ROOT_URLCONF = 'brog.urls'
@@ -118,7 +118,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.7/howto/static-files/
 
 TEMPLATE_DIRS = (
-    os.path.join(os.path.dirname(__file__), 'templates').replace('\\','/'),
+    os.path.join(os.path.dirname(__file__), 'templates').replace('\\', '/'),
 )
 
 

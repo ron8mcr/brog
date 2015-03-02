@@ -5,10 +5,6 @@ __pycache__/
 # C extensions
 *.so
 
-*.ini
-*.conf
-uwsgi_params*
-
 # Distribution / packaging
 .Python
 env/
@@ -64,3 +60,10 @@ target/
 .idea/
 
 media/
+*~
+*_local*
+migrations/
+staticfiles/
+*.ini
+*.conf
+uwsgi_params*

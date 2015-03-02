@@ -9,11 +9,12 @@ from mptt.managers import TreeManager
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.manager import Manager
 from django.db.utils import IntegrityError
-from django.db.models.signals import pre_save
+from django.db.models.signals import pre_save, pre_delete
 from django.core.exceptions import ValidationError
 
 
 class User(AbstractUser):
+
     @property
     def home_directory(self):
         return Directory.objects.root_nodes().get(owner=self)
@@ -22,10 +23,10 @@ class User(AbstractUser):
 # создание домашней папки для каждого пользователя
 @receiver(user_signed_up)
 def make_home_dir(user, **kwargs):
-    home_dir = Directory.objects.create(name=user.username, owner=user)
+    Directory.objects.create(name=user.username, owner=user)
 
 
-class AccessType():
+class AccessType(object):
     NONE = 0
     GROUP = 1
     REGISTERED = 2
@@ -39,10 +40,35 @@ class AccessType():
     )
 
 
+def check_name(instance):
+    """
+    проверка имени файла/директории на лишние символы и уникальность
+    """
+    if '/' in instance.name:
+        raise ValidationError("Запрещено использовать такие символы в имени")
+    try:
+        Directory.objects.get(parent=instance.parent, name=instance.name)
+    except Directory.DoesNotExist:
+        pass
+    else:
+        raise ValidationError(
+            "В данной директории есть директория с тем же именем")
+
+    try:
+        File.objects.get(parent=instance.parent, name=instance.name)
+    except File.DoesNotExist:
+        pass
+    else:
+        raise ValidationError(
+            "В данной директории есть файл с тем же именем")
+
+
 class DirectoryManager(TreeManager):
+
     """ Собственный менеджер для директорий.
     Добавляет возможность выбора директории по полному пути
     """
+
     def get_by_full_path(self, path):
         # TODO: переделать всю
         dirs_in_path = [i for i in path.split('/') if i]
@@ -59,6 +85,7 @@ class DirectoryManager(TreeManager):
             except ObjectDoesNotExist:
                 return None
         return parent
+
 
 class Directory(MPTTModel):
     objects = DirectoryManager()
@@ -83,45 +110,41 @@ class Directory(MPTTModel):
 
     @property
     def full_path(self):
-        return os.path.join(*[i.name for i in
-                              self.get_ancestors(include_self=True)])
+        return "/{}".format(os.path.join(*[i.name for i in
+                                    self.get_ancestors(include_self=True)]))
+
+    def has_access(self, user):
+        if self.access_type == AccessType.ALL:
+            return True
+        elif self.access_type == AccessType.NONE:
+            return user == self.owner
+        elif self.access_type == AccessType.GROUP:
+            return user in self.allowed_users.all()
+        elif self.access_type == AccessType.REGISTERED:
+            return user.is_authenticated()
+        return None
 
     def clean(self):
-        if not has_access(self.parent, self.owner):
-            raise ValidationError("Вы не имеете прав доступа к данной директории!")
-        if '/' in self.name:
-            raise ValidationError("Запрещено использовать такие знаки плохие в названии директории")
-        try:
-            Directory.objects.get(parent=self.parent, name=self.name)
-        except Directory.DoesNotExist as err:
-            pass
-        else:
-            raise ValidationError("Такая директория уже есть")
+        if not self.has_access(self.owner):
+            raise ValidationError(
+                "Вы не имеете прав доступа к данной директории!")
+        check_name(self)
 
-        try:
-            File.objects.get(parent=self.parent, name=self.name)
-        except File.DoesNotExist as err:
-            pass
-        else:
-            raise ValidationError("Есть файл с таким именем")
-
-    # TODO: тщательно протестировать
-    # имеет ли пользователь доступ к папке
-
-
-    class MPTTMeta:
+    class MPTTMeta(object):
         order_insertion_by = ['name']
 
-    class Meta:
+    class Meta(object):
         verbose_name = "Директория"
         verbose_name_plural = "Директории"
         unique_together = ("parent", "name")
 
 
 class FileManager(Manager):
+
     """ Собственный менеджер для файлов.
     Добавляет возможность поиска файла по полному пути
     """
+
     def get_by_full_path(self, path):
         path = path.rstrip('/')
         dirs_path, name = os.path.split(path)
@@ -155,42 +178,33 @@ class File(models.Model):
     def full_path(self):
         return os.path.join(self.parent.full_path, self.name)
 
+    def has_access(self, user):
+        return self.parent.has_access(user)
+
     def clean(self):
-        name = os.path.basename(self.my_file.name)
-        if '/' in name:
-            raise ValidationError("Запрещено использовать такие знаки плохие в названии файла")
-        if not has_access(self.parent, self.owner):
-            raise ValidationError("Вы не имеете прав доступа к данной директории!")
-        try:
-            Directory.objects.get(parent=self.parent, name=name)
-        except Directory.DoesNotExist as err:
-            pass
-        else:
-            raise ValidationError("Директория с таким же именем уже есть")
+        if not self.name:
+            self.name = os.path.basename(self.my_file.name)
 
-        try:
-            File.objects.get(parent=self.parent, name=name)
-        except File.DoesNotExist as err:
-            pass
-        else:
-            raise ValidationError("Есть файл с таким именем в данной директории")
+        # совсем не красиво, но когда файл создается через форму,
+        # owner - пользователь, попытавшийся создать файл
+        # но при работе с админкой owner не заполняется
+        if hasattr(self, 'owner'):
+            if not self.has_access(self.owner):
+                raise ValidationError(
+                    "Вы не имеете прав доступа к данной директории!")
+        check_name(self)
 
-    class Meta():
+    class Meta(object):
         verbose_name = "Файл"
         verbose_name_plural = "Файлы"
         unique_together = ("parent", "name")
 
 
-def has_access(dir, user):
-    if dir.access_type == AccessType.ALL:
-        return True
-    elif dir.access_type == AccessType.NONE:
-        return user == dir.owner
-    elif dir.access_type == AccessType.GROUP:
-        return user in dir.allowed_users
-    elif dir.access_type == AccessType.REGISTERED:
-        return user.is_authenticated()
-    return None
+@receiver(pre_delete, sender=File)
+def file_delete(sender, instance, **kwargs):
+    # Pass false so FileField doesn't save the model.
+    instance.my_file.delete(False)
+
 
 # исключаем сохранение в одной директории
 # файлов и директорий с одинаковыми именами
