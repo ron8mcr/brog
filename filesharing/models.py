@@ -6,7 +6,6 @@ import os
 from allauth.account.signals import user_signed_up
 from django.dispatch import receiver
 from mptt.managers import TreeManager
-from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.manager import Manager
 from django.db.utils import IntegrityError
 from django.db.models.signals import pre_save, pre_delete
@@ -40,21 +39,23 @@ class AccessType(object):
     )
 
 
-class FullPathMixin(object):
-    """ Собственный менеджер для файлов/директорий.
+class DirectoryManager(TreeManager):
+    """ Собственный менеджер для директорий.
     Добавляет возможность выбора директории по полному пути
-    Путь передается по-разному из разных мест:
-     /path, /path/, path/
-    Поэтому так
     """
+
     def get_by_full_path(self, path):
-        path = path.rstrip('/')
-        path = os.path.join('/', path)
-        return self.get(full_path=path)
+        # TODO: переделать всю
+        dirs_in_path = [i for i in path.split('/') if i]
+        if not dirs_in_path:
+            return None
 
+        parent = self.root_nodes().get(name=dirs_in_path[0])
 
-class DirectoryManager(TreeManager, FullPathMixin):
-    pass
+        for d in dirs_in_path[1:]:
+            parent = parent.get_children().get(name=d)
+
+        return parent
 
 
 class CheckNameMixin(object):
@@ -86,9 +87,6 @@ class Directory(CheckNameMixin, MPTTModel):
     access_type = models.IntegerField(choices=AccessType.GROUP_CHOICES,
                                       default=AccessType.NONE,
                                       verbose_name="Тип доступа")
-    # TODO: менять полный путь, если изменяется один из предков
-    full_path = models.CharField(max_length=2048, verbose_name="Полный путь",
-                                 blank=True)
 
     # пользователи, которым разрешён доступ (если таковые имеются)
     allowed_users = models.ManyToManyField(
@@ -97,6 +95,11 @@ class Directory(CheckNameMixin, MPTTModel):
 
     def __str__(self):
         return self.full_path
+
+    @property
+    def full_path(self):
+        return os.path.join('/', *[i.name for i in
+                                   self.get_ancestors(include_self=True)])
 
     def has_access(self, user):
         if self.access_type == AccessType.ALL:
@@ -124,17 +127,17 @@ class Directory(CheckNameMixin, MPTTModel):
         unique_together = ("parent", "name")
 
 
-@receiver(pre_save, sender=Directory)
-def set_dir_full_path(sender, instance, **kwargs):
-    if instance.is_root_node():
-        instance.full_path = os.path.join('/', instance.name)
-    else:
-        instance.full_path = os.path.join(
-            instance.parent.full_path, instance.name)
+class FileManager(Manager):
 
+    """ Собственный менеджер для файлов.
+    Добавляет возможность поиска файла по полному пути
+    """
 
-class FileManager(Manager, FullPathMixin):
-    pass
+    def get_by_full_path(self, path):
+        path = path.rstrip('/')
+        dirs_path, name = os.path.split(path)
+        parent = Directory.objects.get_by_full_path(dirs_path)
+        return self.get(name=name, parent=parent)
 
 
 class File(CheckNameMixin, models.Model):
@@ -143,11 +146,13 @@ class File(CheckNameMixin, models.Model):
     parent = models.ForeignKey(Directory,
                                verbose_name="Родительская директория")
     name = models.CharField(max_length=256, verbose_name="Имя", blank=True)
-    full_path = models.CharField(max_length=2048, verbose_name="Полный путь",
-                                 blank=True)
 
     def __str__(self):
         return self.full_path
+
+    @property
+    def full_path(self):
+        return os.path.join(self.parent.full_path, self.name)
 
     def has_access(self, user):
         return self.parent.has_access(user)
@@ -161,13 +166,6 @@ class File(CheckNameMixin, models.Model):
         verbose_name = "Файл"
         verbose_name_plural = "Файлы"
         unique_together = ("parent", "name")
-
-
-@receiver(pre_save, sender=File)
-def set_file_name_path(instance, **kwargs):
-    if not instance.name:
-        instance.name = os.path.basename(instance.my_file.name)
-    instance.full_path = os.path.join(instance.parent.full_path, instance.name)
 
 
 @receiver(pre_delete, sender=File)

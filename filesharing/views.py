@@ -3,6 +3,7 @@
 from django.http import HttpResponse
 from django.http import HttpResponseRedirect
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from filesharing.models import Directory, File
 from filesharing.forms import CreateDirectoryForm, UploadFileForm, UpdateDirectoryNameForm
 from django.views.generic import TemplateView
@@ -21,7 +22,7 @@ class AddFieldsMixin(object):
             # если появились какие-либо ошибки при добавлении полей в форму,
             # метод сам должен записать эти ошибки и бросить исключение
             form = self.add_fields(form)
-        except Exception as err:
+        except ValidationError as err:
             return self.form_invalid(form)
         self.additional_checks(form)
 
@@ -56,7 +57,7 @@ class DirCreate(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
                 self.kwargs['path'])
         except Directory.DoesNotExist:
             form.add_error(None, "Неверный путь")
-            raise Exception
+            raise ValidationError
         return form
 
     def additional_checks(self, form):
@@ -81,7 +82,7 @@ class FileUpload(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
                 self.kwargs['path'])
         except Directory.DoesNotExist:
             form.add_error(None, "Неверный путь")
-            raise Exception
+            raise ValidationError
         return form
 
     def additional_checks(self, form):
@@ -93,7 +94,7 @@ class FileUpload(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
         form.instance.save()
         messages.add_message(self.request, messages.SUCCESS,
                              "Файл \"{}\" успешно загружен".format(form.instance.name))
-        return super(DirCreate, self).form_valid(form)
+        return super(FileUpload, self).form_valid(form)
 
 
 class DirUpdate(AddFieldsMixin, FormErrorMessagesMixin, UpdateView):
@@ -136,7 +137,7 @@ class DirDelete(DeleteView):
             parent_path = dir_for_del.parent.full_path
         except AttributeError:
             messages.add_message(self.request, messages.ERROR,
-                            "Вы не имеете право удалять домашнюю директорию")
+                                 "Вы не имеете право удалять домашнюю директорию")
             return HttpResponseRedirect(dir_for_del.full_path)
 
         if dir_for_del.has_access(self.request.user):
@@ -145,7 +146,7 @@ class DirDelete(DeleteView):
                                  "Директория была успешно удалена")
         else:
             messages.add_message(self.request, messages.ERROR,
-                            "Вы не имеете право удалять данную директорию")
+                                 "Вы не имеете право удалять данную директорию")
         return HttpResponseRedirect(parent_path)
 
 

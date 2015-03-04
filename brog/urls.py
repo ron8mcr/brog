@@ -4,11 +4,11 @@ from django.contrib import admin
 
 # TEMP для просомтра загруженных файлов
 from django.conf import settings
+from django.views.generic.base import TemplateView
 from django.conf.urls.static import static
+from filesharing.views import FileUpload, DirCreate, DirUpdate, DirDelete, FilesView
 
 admin.autodiscover()
-
-from filesharing.views import *
 
 urlpatterns = patterns('',
     url(r'^$', TemplateView.as_view(template_name="index.html")),
