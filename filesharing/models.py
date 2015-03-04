@@ -40,54 +40,41 @@ class AccessType(object):
     )
 
 
-def check_name(instance):
+class FullPathMixin(object):
+    """ Собственный менеджер для файлов/директорий.
+    Добавляет возможность выбора директории по полному пути
+    Путь передается по-разному из разных мест:
+     /path, /path/, path/
+    Поэтому так
+    """
+    def get_by_full_path(self, path):
+        path = path.rstrip('/')
+        path = os.path.join('/', path)
+        return self.get(full_path=path)
+
+
+class DirectoryManager(TreeManager, FullPathMixin):
+    pass
+
+
+class CheckNameMixin(object):
     """
     проверка имени файла/директории на лишние символы и уникальность
     """
-    if '/' in instance.name:
-        raise ValidationError("Запрещено использовать такие символы в имени")
-    try:
-        Directory.objects.get(parent=instance.parent, name=instance.name)
-    except Directory.DoesNotExist:
-        pass
-    else:
-        raise ValidationError(
-            "В данной директории есть директория с тем же именем")
+    def clean(self):
+        if '/' in self.name:
+            raise ValidationError("Запрещено использовать такие символы в имени")
 
-    try:
-        File.objects.get(parent=instance.parent, name=instance.name)
-    except File.DoesNotExist:
-        pass
-    else:
-        raise ValidationError(
-            "В данной директории есть файл с тем же именем")
+        if Directory.objects.filter(parent=self.parent, name=self.name).first():
+            raise ValidationError(
+                "В данной директории есть директория с тем же именем")
+
+        if File.objects.filter(parent=self.parent, name=self.name).first():
+            raise ValidationError(
+                "В данной директории есть файл с тем же именем")
 
 
-class DirectoryManager(TreeManager):
-
-    """ Собственный менеджер для директорий.
-    Добавляет возможность выбора директории по полному пути
-    """
-
-    def get_by_full_path(self, path):
-        # TODO: переделать всю
-        dirs_in_path = [i for i in path.split('/') if i]
-        if not dirs_in_path:
-            return None
-        try:
-            parent = self.root_nodes().get(name=dirs_in_path[0])
-        except ObjectDoesNotExist:
-            return None
-
-        for d in dirs_in_path[1:]:
-            try:
-                parent = parent.get_children().get(name=d)
-            except ObjectDoesNotExist:
-                return None
-        return parent
-
-
-class Directory(MPTTModel):
+class Directory(CheckNameMixin, MPTTModel):
     objects = DirectoryManager()
     name = models.CharField(max_length=256,
                             verbose_name="Имя")
@@ -99,6 +86,9 @@ class Directory(MPTTModel):
     access_type = models.IntegerField(choices=AccessType.GROUP_CHOICES,
                                       default=AccessType.NONE,
                                       verbose_name="Тип доступа")
+    # TODO: менять полный путь, если изменяется один из предков
+    full_path = models.CharField(max_length=2048, verbose_name="Полный путь",
+                                 blank=True)
 
     # пользователи, которым разрешён доступ (если таковые имеются)
     allowed_users = models.ManyToManyField(
@@ -107,11 +97,6 @@ class Directory(MPTTModel):
 
     def __str__(self):
         return self.full_path
-
-    @property
-    def full_path(self):
-        return "/{}".format(os.path.join(*[i.name for i in
-                                    self.get_ancestors(include_self=True)]))
 
     def has_access(self, user):
         if self.access_type == AccessType.ALL:
@@ -127,8 +112,8 @@ class Directory(MPTTModel):
     def clean(self):
         if not self.has_access(self.owner):
             raise ValidationError(
-                "Вы не имеете прав доступа к данной директории!")
-        check_name(self)
+                "Вам сюда доступ запрещён")
+        super(Directory, self).clean()
 
     class MPTTMeta(object):
         order_insertion_by = ['name']
@@ -139,44 +124,30 @@ class Directory(MPTTModel):
         unique_together = ("parent", "name")
 
 
-class FileManager(Manager):
-
-    """ Собственный менеджер для файлов.
-    Добавляет возможность поиска файла по полному пути
-    """
-
-    def get_by_full_path(self, path):
-        path = path.rstrip('/')
-        dirs_path, name = os.path.split(path)
-        parent = Directory.objects.get_by_full_path(dirs_path)
-        try:
-            return self.get(name=name, parent=parent)
-        except ObjectDoesNotExist:
-            return None
+@receiver(pre_save, sender=Directory)
+def set_dir_full_path(sender, instance, **kwargs):
+    if instance.is_root_node():
+        instance.full_path = os.path.join('/', instance.name)
+    else:
+        instance.full_path = os.path.join(
+            instance.parent.full_path, instance.name)
 
 
-class File(models.Model):
+class FileManager(Manager, FullPathMixin):
+    pass
+
+
+class File(CheckNameMixin, models.Model):
     objects = FileManager()
     my_file = models.FileField(verbose_name="Файл")
     parent = models.ForeignKey(Directory,
                                verbose_name="Родительская директория")
     name = models.CharField(max_length=256, verbose_name="Имя", blank=True)
-
-    # при сохранении надо "вычислить" поле name
-    def save(self, *args, **kwargs):
-        # жизненный цикл файла не включает переименование
-        # но filefield при пересохранении меняет физическое имя файла
-        # так что есть проверка
-        if not self.name:
-            self.name = os.path.basename(self.my_file.name)
-        super(File, self).save(*args, **kwargs)
+    full_path = models.CharField(max_length=2048, verbose_name="Полный путь",
+                                 blank=True)
 
     def __str__(self):
         return self.full_path
-
-    @property
-    def full_path(self):
-        return os.path.join(self.parent.full_path, self.name)
 
     def has_access(self, user):
         return self.parent.has_access(user)
@@ -184,15 +155,7 @@ class File(models.Model):
     def clean(self):
         if not self.name:
             self.name = os.path.basename(self.my_file.name)
-
-        # совсем не красиво, но когда файл создается через форму,
-        # owner - пользователь, попытавшийся создать файл
-        # но при работе с админкой owner не заполняется
-        if hasattr(self, 'owner'):
-            if not self.has_access(self.owner):
-                raise ValidationError(
-                    "Вы не имеете прав доступа к данной директории!")
-        check_name(self)
+        super(File, self).clean()
 
     class Meta(object):
         verbose_name = "Файл"
@@ -200,14 +163,23 @@ class File(models.Model):
         unique_together = ("parent", "name")
 
 
+@receiver(pre_save, sender=File)
+def set_file_name_path(instance, **kwargs):
+    if not instance.name:
+        instance.name = os.path.basename(instance.my_file.name)
+    instance.full_path = os.path.join(instance.parent.full_path, instance.name)
+
+
 @receiver(pre_delete, sender=File)
-def file_delete(sender, instance, **kwargs):
+def file_delete(instance, **kwargs):
     # Pass false so FileField doesn't save the model.
     instance.my_file.delete(False)
 
 
 # исключаем сохранение в одной директории
 # файлов и директорий с одинаковыми именами
+@receiver(pre_save, sender=File)
+@receiver(pre_save, sender=Directory)
 def check_duplicate(sender, instance, **kwargs):
     if sender == Directory:
         another_type = File
@@ -222,7 +194,3 @@ def check_duplicate(sender, instance, **kwargs):
         return
     raise IntegrityError("В одной директории не может быть "
                          "файла и директории с одинаковыми именами")
-
-
-pre_save.connect(check_duplicate, sender=Directory)
-pre_save.connect(check_duplicate, sender=File)

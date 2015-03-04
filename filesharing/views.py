@@ -3,78 +3,125 @@
 from django.http import HttpResponse
 from django.http import HttpResponseRedirect
 from django.contrib import messages
-
 from filesharing.models import Directory, File
 from filesharing.forms import CreateDirectoryForm, UploadFileForm, UpdateDirectoryNameForm
-
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormMixin, CreateView, UpdateView, DeleteView
 
-# переопределячем значение тэга сообщения под стиль бутстрапа,
-# чтобы вместо error стал danger
-from django.contrib.messages import constants as message_constants
-MESSAGE_TAGS = {message_constants.ERROR: 'danger', }
 
-
-class IndexView(TemplateView):
-    template_name = 'index.html'
-
-
-class DirFileCreate(CreateView):
-
+class AddFieldsMixin(object):
+    """ Миксин для добавления дополнительных полей в экземпляр
+    И дополнительных проверок, например, на права доступа
+    """
     def post(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         form = self.get_form(form_class)
-        # заполняем неполученные поля
-        self.parent_path = self.kwargs['path']
-        form.instance.parent = Directory.objects.get_by_full_path(
-            self.parent_path)
-        form.instance.owner = self.request.user
+
+        try:
+            # если появились какие-либо ошибки при добавлении полей в форму,
+            # метод сам должен записать эти ошибки и бросить исключение
+            form = self.add_fields(form)
+        except Exception as err:
+            return self.form_invalid(form)
+        self.additional_checks(form)
 
         if form.is_valid():
             return self.form_valid(form)
         else:
             return self.form_invalid(form)
 
-    def form_valid(self, form):
-        self.success_url = self.parent_path
-        form.instance.save()
-        return super(DirFileCreate, self).form_valid(form)
+    def add_fields(self, form):
+        return form
 
+    def additional_checks(self, form):
+        pass
+
+
+class FormErrorMessagesMixin(object):
     def form_invalid(self, form):
-        # TODO: ошибки полей
         for err_type in form.errors:
             for err in form.errors[err_type]:
                 messages.add_message(self.request, messages.ERROR, err)
-        return HttpResponseRedirect(self.parent_path)
+        return HttpResponseRedirect(self.kwargs['path'])
 
 
-class DirUpdate(UpdateView):
+class DirCreate(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
+    template_name = 'home.html'
+    form_class = CreateDirectoryForm
+
+    def add_fields(self, form):
+        form.instance.owner = self.request.user
+        try:
+            form.instance.parent = Directory.objects.get_by_full_path(
+                self.kwargs['path'])
+        except Directory.DoesNotExist:
+            form.add_error(None, "Неверный путь")
+            raise Exception
+        return form
+
+    def additional_checks(self, form):
+        if not form.instance.parent.has_access(self.request.user):
+            form.add_error(None, "Вы не имеете прав доступа к данной директории!")
+
+    def form_valid(self, form):
+        self.success_url = self.kwargs['path']
+        form.instance.save()
+        messages.add_message(self.request, messages.SUCCESS,
+                             "Директория \"{}\" успешно cоздана".format(form.instance.name))
+        return super(DirCreate, self).form_valid(form)
+
+
+class FileUpload(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
+    template_name = 'home.html'
+    form_class = UploadFileForm
+
+    def add_fields(self, form):
+        try:
+            form.instance.parent = Directory.objects.get_by_full_path(
+                self.kwargs['path'])
+        except Directory.DoesNotExist:
+            form.add_error(None, "Неверный путь")
+            raise Exception
+        return form
+
+    def additional_checks(self, form):
+        if not form.instance.parent.has_access(self.request.user):
+            form.add_error(None, "Вы не имеете прав доступа к данной директории!")
+
+    def form_valid(self, form):
+        self.success_url = self.kwargs['path']
+        form.instance.save()
+        messages.add_message(self.request, messages.SUCCESS,
+                             "Файл \"{}\" успешно загружен".format(form.instance.name))
+        return super(DirCreate, self).form_valid(form)
+
+
+class DirUpdate(AddFieldsMixin, FormErrorMessagesMixin, UpdateView):
+    form_class = UpdateDirectoryNameForm
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return super(DirUpdate, self).post(request, *args, **kwargs)
 
     def get_object(self, queryset=None):
         return Directory.objects.get_by_full_path(self.kwargs['path'])
 
+    def additional_checks(self, form):
+        for_rename = self.get_object()
+        if for_rename in Directory.objects.root_nodes():
+            form.add_error(None, "Невозможно переименовать домашнюю директорию")
+            return
+        if not for_rename.has_access(self.request.user):
+            form.add_error(None, "Вы не имеете прав доступа к данной директории!")
+
     def form_valid(self, form):
         for_rename = self.get_object()
         instance = form.save(commit=False)
-
-        # домашние папки изменять нельзя
-        if for_rename in Directory.objects.root_nodes():
-            messages.add_message(self.request, messages.ERROR,
-                            "Невозможно переименовать домашнюю директорию")
-            return HttpResponseRedirect(self.kwargs['path'])
-
         instance.save()
         messages.add_message(self.request, messages.SUCCESS,
-                    "Директория \"{}\" успешно переименована в \"{}\"".format(
-                    for_rename.name, instance.name))
+                             "Директория \"{}\" успешно переименована в \"{}\"".format(
+                                 for_rename.name, instance.name))
         return HttpResponseRedirect(instance.full_path)
-
-    def form_invalid(self, form):
-        for err_type in form.errors:
-            for err in form.errors[err_type]:
-                messages.add_message(self.request, messages.ERROR, err)
-        return HttpResponseRedirect(self.parent_path)
 
 
 class DirDelete(DeleteView):
@@ -109,62 +156,55 @@ class FilesView(FormMixin, TemplateView):
     }
     template_name = 'home.html'
 
-    def navigation_inform(self):
+    def navigation_inform(self, cur_dir):
         """
         :return:информация для полей навигации
         """
-        result = dict()
+        return {
+            # папки, составляющие полный пусть (для СТРОКИ навигации)
+            'path_dirs': cur_dir.get_ancestors(include_self=True),
+            # дерево папок пользователя - для ДЕРЕВА навигации
+            'user_dirs': self.request.user.home_directory.get_descendants(
+                include_self=True),
+            'cur_dir': cur_dir
+        }
 
-        # папки, составляющие полный пусть (для СТРОКИ навигации)
-        result['path_dirs'] = self.cur_dir.get_ancestors(
-            include_self=True)
-
-        # дерево папок пользователя - для ДЕРЕВА навигации
-        result['user_dirs'] = self.request.user.home_directory.get_descendants(
-            include_self=True)
-        result['cur_dir'] = self.cur_dir
-        return result
-
-    def prepare_dir_context(self, context):
+    def prepare_dir_context(self, cur_dir):
         # список файлов и папок в текущей директории
-        if not self.cur_dir.has_access(self.request.user):
-            context['critical_error'] = self.errors['ACCESS_DENIED']
+        if not cur_dir.has_access(self.request.user):
+            return {'critical_error': self.errors['ACCESS_DENIED']}
         else:
-            context['files'] = File.objects.filter(parent=self.cur_dir)
-            context['dirs'] = Directory.objects.filter(parent=self.cur_dir)
+            result = {
+                'files': File.objects.filter(parent=cur_dir),
+                'dirs': Directory.objects.filter(parent=cur_dir),
+                'CreateDirForm': CreateDirectoryForm,
+                'UploadFileForm': UploadFileForm,
+                'UpdateDirectoryNameForm': UpdateDirectoryNameForm,
+            }
+            result.update(self.navigation_inform(cur_dir))
+            return result
 
-            # информация для навигации
-            context.update(self.navigation_inform())
-
-            context['CreateDirForm'] = self.get_form(CreateDirectoryForm)
-            context['UploadFileForm'] = self.get_form(UploadFileForm)
-            context['UpdateDirectoryNameForm'] = self.get_form(
-                UpdateDirectoryNameForm)
-        return context
-
-    def prepare_file_context(self, context):
-        self.cur_dir = self.cur_file.parent
-        if not self.cur_file.has_access(self.request.user):
-            context['critical_error'] = self.errors['ACCESS_DENIED']
+    def prepare_file_context(self, cur_file):
+        if not cur_file.has_access(self.request.user):
+            return {'critical_error': self.errors['ACCESS_DENIED']}
         else:
-            context['file'] = self.cur_file
-        return context
+            result = {'file': cur_file}
+            result.update(self.navigation_inform(cur_file.parent))
+            return result
 
     def get_context_data(self, **kwargs):
         path = self.kwargs['path']
         context = super(FilesView, self).get_context_data(**kwargs)
         context['messages'] = messages.get_messages(self.request)
 
-        self.cur_dir = Directory.objects.get_by_full_path(path)
-        if self.cur_dir:
-            # если по запрошенному пути найдена папка
-            context = self.prepare_dir_context(context)
-        else:
-            # если по запрошенному пути найден файл
-            self.cur_file = File.objects.get_by_full_path(path)
-            if self.cur_file:
-                context = self.prepare_file_context(context)
-            else:
+        try:
+            context.update(self.prepare_dir_context(
+                Directory.objects.get_by_full_path(path)))
+        except Directory.DoesNotExist:
+            try:
+                context.update(self.prepare_file_context(
+                    File.objects.get_by_full_path(path)))
+            except File.DoesNotExist:
                 context['critical_error'] = self.errors['BAD_PATH']
 
         return context
