@@ -43,6 +43,10 @@ INSTALLED_APPS = (
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.vk',
+    'sendfile',
+    'rest_framework',
+    'api',
+    'rest_framework.authtoken',
 )
 
 
@@ -124,5 +128,16 @@ TEMPLATE_DIRS = (
 
 MEDIA_URL = '/media/'
 STATIC_URL = '/static/'
+
+SENDFILE_BACKEND = 'sendfile.backends.development'
+#SENDFILE_BACKEND = 'sendfile.backends.nginx'
+SENDFILE_ROOT = os.path.join(BASE_DIR, 'media')
+SENDFILE_URL = '/media'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
+    )
+}
 
 from .settings_local import *

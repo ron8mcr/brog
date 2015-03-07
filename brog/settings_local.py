@@ -22,3 +22,6 @@ STATIC_ROOT = 'staticfiles'
 STATICFILES_DIRS = (
     'brog/static/',
 )
+
+SENDFILE_BACKEND = 'sendfile.backends.development'
+#SENDFILE_BACKEND = 'sendfile.backends.nginx'

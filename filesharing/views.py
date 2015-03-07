@@ -8,6 +8,8 @@ from filesharing.models import Directory, File
 from filesharing.forms import CreateDirectoryForm, UploadFileForm, UpdateDirectoryNameForm
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormMixin, CreateView, UpdateView, DeleteView
+from sendfile import sendfile
+from rest_framework.authtoken.models import Token
 
 
 class AddFieldsMixin(object):
@@ -66,7 +68,6 @@ class DirCreate(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
 
     def form_valid(self, form):
         self.success_url = self.kwargs['path']
-        form.instance.save()
         messages.add_message(self.request, messages.SUCCESS,
                              "Директория \"{}\" успешно cоздана".format(form.instance.name))
         return super(DirCreate, self).form_valid(form)
@@ -91,7 +92,6 @@ class FileUpload(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
 
     def form_valid(self, form):
         self.success_url = self.kwargs['path']
-        form.instance.save()
         messages.add_message(self.request, messages.SUCCESS,
                              "Файл \"{}\" успешно загружен".format(form.instance.name))
         return super(FileUpload, self).form_valid(form)
@@ -197,6 +197,7 @@ class FilesView(FormMixin, TemplateView):
         path = self.kwargs['path']
         context = super(FilesView, self).get_context_data(**kwargs)
         context['messages'] = messages.get_messages(self.request)
+        context['token'] = Token.objects.get(user=self.request.user).key
 
         try:
             context.update(self.prepare_dir_context(
@@ -205,17 +206,15 @@ class FilesView(FormMixin, TemplateView):
             try:
                 context.update(self.prepare_file_context(
                     File.objects.get_by_full_path(path)))
-            except File.DoesNotExist:
+            except (Directory.DoesNotExist, File.DoesNotExist):
                 context['critical_error'] = self.errors['BAD_PATH']
 
         return context
 
     def render_to_response(self, context):
         if 'file' in context:
-            response = HttpResponse()
-            response['Content-Disposition'] = "attachment; filename=" + \
-                context['file'].name
-            response['X-Accel-Redirect'] = context['file'].my_file.url
-            return response
+            for_send = context['file']
+            return sendfile(self.request, for_send.my_file.path,
+                            attachment=True, attachment_filename=for_send.name)
 
         return super(FilesView, self).render_to_response(context)

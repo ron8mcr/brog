@@ -20,13 +20,13 @@
                     <button type="submit" class="btn btn-success">Выйти</button>
                 </form>
 
-                {% if request.user.first_name or request.user.last_name %}
+               {% if request.user.first_name or request.user.last_name %}
                     <p class="navbar-text navbar-right">Вы вошли как: <b
-                            style="color:white">{{ request.user.first_name }} {{ request.user.last_name }}</b></p>
+                            style="color:white">{{ request.user.first_name }} {{ request.user.last_name }} token: {{ token }}</b></p>
                 {% else %}
                     <p class="navbar-text navbar-right">Вы вошли как: <b
                             style="color:white">{{ request.user.username }}</b>
-                        {% if not request.user.profile.account_verified %} (не подтвержден) {% endif %}</p>
+                        {% if not request.user.profile.account_verified %} (не подтвержден) token: {{ token }} {% endif %}</p>
                 {% endif %}
 
             {% else %}

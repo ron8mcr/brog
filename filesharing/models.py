@@ -10,6 +10,11 @@ from django.db.models.manager import Manager
 from django.db.utils import IntegrityError
 from django.db.models.signals import pre_save, pre_delete
 from django.core.exceptions import ValidationError
+from django.core.files.storage import FileSystemStorage
+from django.conf import settings
+from rest_framework.authtoken.models import Token
+
+sendfile_storage = FileSystemStorage(location=settings.SENDFILE_ROOT)
 
 
 class User(AbstractUser):
@@ -20,9 +25,11 @@ class User(AbstractUser):
 
 
 # создание домашней папки для каждого пользователя
+# TODO: разбить или переименовать
 @receiver(user_signed_up)
 def make_home_dir(user, **kwargs):
     Directory.objects.create(name=user.username, owner=user)
+    Token.objects.create(user=user)
 
 
 class AccessType(object):
@@ -142,7 +149,7 @@ class FileManager(Manager):
 
 class File(CheckNameMixin, models.Model):
     objects = FileManager()
-    my_file = models.FileField(verbose_name="Файл")
+    my_file = models.FileField(storage=sendfile_storage, verbose_name="Файл")
     parent = models.ForeignKey(Directory,
                                verbose_name="Родительская директория")
     name = models.CharField(max_length=256, verbose_name="Имя", blank=True)

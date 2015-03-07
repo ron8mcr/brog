@@ -6,7 +6,7 @@ from django.contrib import admin
 from django.conf import settings
 from django.views.generic.base import TemplateView
 from django.conf.urls.static import static
-from filesharing.views import FileUpload, DirCreate, DirUpdate, DirDelete, FilesView
+from rest_framework.urlpatterns import format_suffix_patterns
 
 admin.autodiscover()
 
@@ -16,16 +16,8 @@ urlpatterns = patterns('',
     url(r'^accounts/profile/$', TemplateView.as_view(
         template_name='profile.html')),
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^upload/file/path=(?P<path>.+)$',
-        FileUpload.as_view()),
-    url(r'^create/dir/path=(?P<path>.+)$',
-        DirCreate.as_view()),
-    url(r'^update/dir/path=(?P<path>.+)$',
-        DirUpdate.as_view()),
-    url(r'^delete/dir/path=(?P<path>.+)$',
-        DirDelete.as_view()),
-    url(r'(?P<path>.+)/$', FilesView.as_view()),
-
+    url(r'^api/', include('api.urls')),
+    url(r'^', include('filesharing.urls')),
 )
 
 # TEMP для просмотра загруженных файлов

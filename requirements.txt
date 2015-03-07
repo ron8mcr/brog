@@ -3,3 +3,5 @@ Django-mptt==0.6
 psycopg2
 django-allauth
 whitenoise
+django-sendfile
+djangorestframework
