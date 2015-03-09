@@ -4,13 +4,13 @@ from filesharing.views import FileUpload, DirCreate, DirUpdate, DirDelete, Files
 
 
 urlpatterns = patterns('',
-    url(r'^upload/file/path=(?P<path>.+)$',
+    url(r'^upload/file/path=(?P<full_path>.+)$',
         FileUpload.as_view()),
-    url(r'^create/dir/path=(?P<path>.+)$',
+    url(r'^create/dir/path=(?P<full_path>.+)$',
         DirCreate.as_view()),
-    url(r'^update/dir/path=(?P<path>.+)$',
+    url(r'^update/dir/path=(?P<full_path>.+)$',
         DirUpdate.as_view()),
-    url(r'^delete/dir/path=(?P<path>.+)$',
+    url(r'^delete/dir/path=(?P<full_path>.+)$',
         DirDelete.as_view()),
-    url(r'(?P<path>.+)/$', FilesView.as_view()),
+    url(r'(?P<full_path>.+)/$', FilesView.as_view()),
 )

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from django.http import Http404
-from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework import generics
 from rest_framework.response import Response
@@ -12,187 +11,145 @@ from api.serializers import DirectorySerializer, FileSerializer
 from sendfile import sendfile
 
 
-def get_object_by_id_or_path(model=Directory, pk=None, path=None):
-    if pk:
-        return get_object_or_404(model, pk=pk)
-    if path:
-        try:
-            return model.objects.get_by_full_path(path)
-        except model.DoesNotExist:
-            raise Http404
+# эта функция дублирует стандартную
+# get_object_or_404
+# но стандартная почему из-за внутренних хитростей
+# не вызывает переопределённый нами метод objects.get
+# в котором происходит преобразование пути
+def get_obj_or_404(klass, **kwargs):
+    try:
+        return klass.objects.get(**kwargs)
+    except klass.DoesNotExist:
+        raise Http404
 
 
-class DirList(APIView):
-    authentication_classes = (SessionAuthentication, BasicAuthentication, TokenAuthentication)
+# аналогично
+def get_lst_or_404(klass, **kwargs):
+    try:
+        return klass.objects.filter(**kwargs)
+    except klass.DoesNotExist:
+        raise Http404
+
+
+class AuthPermClassesMixin(object):
+    authentication_classes = (SessionAuthentication,
+                              BasicAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
 
-    def get(self, request, format=None):
-        dirs = Directory.objects.all()#filter(owner=self.request.user)
-        serializer = DirectorySerializer(dirs, many=True)
-        return Response(serializer.data)
 
+class DirDetail(AuthPermClassesMixin, generics.GenericAPIView):
+    serializer_class = DirectorySerializer
 
-class DirDetail(APIView):
-    authentication_classes = (SessionAuthentication, BasicAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated,)
-
-    def get(self, request, pk=None, path=None, format=None):
-        dir = get_object_by_id_or_path(model=Directory, pk=pk, path=path)
-        if dir.has_access(self.request.user):
-            serializer = DirectorySerializer(dir)
+    def get(self, request, **kwargs):
+        cur_dir = get_obj_or_404(Directory, **kwargs)
+        if cur_dir.has_access(self.request.user):
+            serializer = DirectorySerializer(cur_dir)
             return Response(serializer.data)
         else:
             raise exceptions.PermissionDenied()
 
-    def post(self, request, pk=None, path=None, format=None):
-        parent_dir = get_object_by_id_or_path(model=Directory, pk=pk, path=path)
+    def post(self, request, **kwargs):
+        parent_dir = get_obj_or_404(Directory, **kwargs)
         self.request.data['owner'] = self.request.user.id
         self.request.data['parent'] = parent_dir.id
         serializer = DirectorySerializer(data=self.request.data)
         if parent_dir.has_access(self.request.user):
             if serializer.is_valid():
                 serializer.save()
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                return Response(serializer.data,
+                                status=status.HTTP_201_CREATED)
+            return Response(serializer.errors,
+                            status=status.HTTP_400_BAD_REQUEST)
         else:
             raise exceptions.PermissionDenied()
 
-    def put(self, request, pk=None, path=None, format=None):
-        dir = get_object_by_id_or_path(model=Directory, pk=pk, path=path)
-        serializer = DirectorySerializer(dir, data=request.data)
+    def put(self, request, **kwargs):
+        cur_dir = get_obj_or_404(Directory, **kwargs)
+        serializer = DirectorySerializer(cur_dir, data=request.data)
 
-        if dir.has_access(self.request.user):
+        if cur_dir.has_access(self.request.user) and \
+                        cur_dir not in Directory.objects.root_nodes():
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors,
+                            status=status.HTTP_400_BAD_REQUEST)
         else:
             raise exceptions.PermissionDenied()
 
-    def delete(self, request, pk=None, path=None, format=None):
-        dir = get_object_by_id_or_path(model=Directory, pk=pk, path=path)
+    def delete(self, request, **kwargs):
+        cur_dir = get_obj_or_404(Directory, **kwargs)
 
-        if dir.has_access(self.request.user):
-            dir.delete()
+        if cur_dir.has_access(self.request.user) and \
+                        cur_dir not in Directory.objects.root_nodes():
+            cur_dir.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         else:
             raise exceptions.PermissionDenied()
 
 
-class DirsListByParentId(generics.ListAPIView):
-    authentication_classes = (SessionAuthentication, BasicAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated,)
-
-    serializer_class = DirectorySerializer
-
-    def get_queryset(self):
-        pk = self.kwargs['pk']
-        cur_dir = Directory.objects.get(pk=pk)
-        try:
-            return Directory.objects.filter(owner=self.request.user, parent=cur_dir)
-        except Directory.DoesNotExist:
-            raise Http404
-
-
-class DirsListByParentPath(generics.ListAPIView):
-    authentication_classes = (SessionAuthentication, BasicAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated,)
-
-    serializer_class = DirectorySerializer
-
-    def get_queryset(self):
-        path = self.kwargs['path']
-        cur_dir = Directory.objects.get_by_full_path(path=path)
-        try:
-            return Directory.objects.filter(owner=self.request.user, parent=cur_dir)
-        except Directory.DoesNotExist:
-            raise Http404
-
-
-class FilesListByParentId(generics.ListAPIView):
-    authentication_classes = (SessionAuthentication, BasicAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated,)
-
+class FileDetail(AuthPermClassesMixin, generics.GenericAPIView):
     serializer_class = FileSerializer
 
-    def get_queryset(self):
-        pk = self.kwargs['pk']
-        cur_dir = Directory.objects.get(pk=pk)
-        if cur_dir.has_access(self.request.user):
-            try:
-                return File.objects.filter(parent=cur_dir)
-            except File.DoesNotExist:
-                raise Http404
-        else:
-            raise exceptions.PermissionDenied()
-
-
-class FilesListByParentPath(generics.ListAPIView):
-    authentication_classes = (SessionAuthentication, BasicAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated,)
-
-    serializer_class = FileSerializer
-
-    def get_queryset(self):
-        path = self.kwargs['path']
-        cur_dir = Directory.objects.get_by_full_path(path=path)
-        if cur_dir.has_access(self.request.user):
-            try:
-                return File.objects.filter(parent=cur_dir)
-            except File.DoesNotExist:
-                raise Http404
-        else:
-            raise exceptions.PermissionDenied()
-
-
-class FileDownload(APIView):
-    authentication_classes = (SessionAuthentication, BasicAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated,)
-
-    def get(self, request, pk=None, path=None, format=None):
-        file = get_object_by_id_or_path(model=File, pk=pk, path=path)
-        if file.has_access(self.request.user):
-            sendfile(self.request, file.my_file.path,
-                     attachment=True, attachment_filename=file.name)
-        else:
-            raise exceptions.PermissionDenied()
-
-
-class FileUpload(generics.CreateAPIView):
-    authentication_classes = (SessionAuthentication, BasicAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated,)
-
-    serializer_class = FileSerializer
-
-    def post(self, request, pk=None, path=None, format=None):
-        cur_dir = get_object_by_id_or_path(model=Directory, pk=pk, path=path)
-        self.request.data['parent'] = cur_dir.id
-        serializer = FileSerializer(data=self.request.data)
-        if cur_dir.has_access(self.request.user):
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            raise exceptions.PermissionDenied()
-
-
-class FileDetail(APIView):
-    authentication_classes = (SessionAuthentication, BasicAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated,)
-
-    def get(self, request, pk=None, path=None, format=None):
-        file = get_object_by_id_or_path(model=File, pk=pk, path=path)
+    def get(self, request, **kwargs):
+        file = get_obj_or_404(File, **kwargs)
         if file.has_access(self.request.user):
             serializer = FileSerializer(file)
             return Response(serializer.data)
         else:
             raise exceptions.PermissionDenied()
 
-    def delete(self, request, pk=None, path=None, format=None):
-        file = get_object_by_id_or_path(model=File, pk=pk, path=path)
+    def delete(self, request, **kwargs):
+        file = get_obj_or_404(klass=File, **kwargs)
         if file.has_access(self.request.user):
             file.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            raise exceptions.PermissionDenied()
+
+    def post(self, request, **kwargs):
+        cur_dir = get_obj_or_404(Directory, **kwargs)
+        self.request.data['parent'] = cur_dir.id
+        serializer = FileSerializer(data=self.request.data)
+        if cur_dir.has_access(self.request.user):
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data,
+                                status=status.HTTP_201_CREATED)
+            return Response(serializer.errors,
+                            status=status.HTTP_400_BAD_REQUEST)
+        else:
+            raise exceptions.PermissionDenied()
+
+
+class DirsList(AuthPermClassesMixin, generics.ListAPIView):
+    serializer_class = DirectorySerializer
+
+    def get_queryset(self):
+        cur_dir = get_obj_or_404(Directory, **self.kwargs)
+        if cur_dir.has_access(self.request.user):
+            return get_lst_or_404(Directory, parent=cur_dir)
+        else:
+            raise exceptions.PermissionDenied()
+
+
+class FilesList(AuthPermClassesMixin, generics.ListAPIView):
+    serializer_class = FileSerializer
+
+    def get_queryset(self):
+        cur_dir = get_obj_or_404(Directory, **self.kwargs)
+        if cur_dir.has_access(self.request.user):
+            return get_lst_or_404(File, parent=cur_dir)
+        else:
+            raise exceptions.PermissionDenied()
+
+
+class FileDownload(AuthPermClassesMixin, APIView):
+
+    def get(self, request, **kwargs):
+        file = get_obj_or_404(File, **kwargs)
+        if file.has_access(self.request.user):
+            sendfile(self.request, file.my_file.path,
+                     attachment=True, attachment_filename=file.name)
         else:
             raise exceptions.PermissionDenied()

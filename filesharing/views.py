@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from django.http import HttpResponse
 from django.http import HttpResponseRedirect
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -45,7 +44,7 @@ class FormErrorMessagesMixin(object):
         for err_type in form.errors:
             for err in form.errors[err_type]:
                 messages.add_message(self.request, messages.ERROR, err)
-        return HttpResponseRedirect(self.kwargs['path'])
+        return HttpResponseRedirect(self.kwargs['full_path'])
 
 
 class DirCreate(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
@@ -55,8 +54,7 @@ class DirCreate(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
     def add_fields(self, form):
         form.instance.owner = self.request.user
         try:
-            form.instance.parent = Directory.objects.get_by_full_path(
-                self.kwargs['path'])
+            form.instance.parent = Directory.objects.get(full_path=self.kwargs['full_path'])
         except Directory.DoesNotExist:
             form.add_error(None, "Неверный путь")
             raise ValidationError
@@ -67,7 +65,7 @@ class DirCreate(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
             form.add_error(None, "Вы не имеете прав доступа к данной директории!")
 
     def form_valid(self, form):
-        self.success_url = self.kwargs['path']
+        self.success_url = self.kwargs['full_path']
         messages.add_message(self.request, messages.SUCCESS,
                              "Директория \"{}\" успешно cоздана".format(form.instance.name))
         return super(DirCreate, self).form_valid(form)
@@ -79,8 +77,7 @@ class FileUpload(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
 
     def add_fields(self, form):
         try:
-            form.instance.parent = Directory.objects.get_by_full_path(
-                self.kwargs['path'])
+            form.instance.parent = Directory.objects.get(full_path=self.kwargs['full_path'])
         except Directory.DoesNotExist:
             form.add_error(None, "Неверный путь")
             raise ValidationError
@@ -91,7 +88,7 @@ class FileUpload(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
             form.add_error(None, "Вы не имеете прав доступа к данной директории!")
 
     def form_valid(self, form):
-        self.success_url = self.kwargs['path']
+        self.success_url = self.kwargs['full_path']
         messages.add_message(self.request, messages.SUCCESS,
                              "Файл \"{}\" успешно загружен".format(form.instance.name))
         return super(FileUpload, self).form_valid(form)
@@ -105,7 +102,7 @@ class DirUpdate(AddFieldsMixin, FormErrorMessagesMixin, UpdateView):
         return super(DirUpdate, self).post(request, *args, **kwargs)
 
     def get_object(self, queryset=None):
-        return Directory.objects.get_by_full_path(self.kwargs['path'])
+        return Directory.objects.get(full_path=self.kwargs['full_path'])
 
     def additional_checks(self, form):
         for_rename = self.get_object()
@@ -129,7 +126,7 @@ class DirDelete(DeleteView):
     model = Directory
 
     def get_object(self, queryset=None):
-        return Directory.objects.get_by_full_path(self.kwargs['path'])
+        return Directory.objects.get(full_path=self.kwargs['full_path'])
 
     def delete(self, request, *args, **kwargs):
         dir_for_del = self.get_object()
@@ -194,18 +191,22 @@ class FilesView(FormMixin, TemplateView):
             return result
 
     def get_context_data(self, **kwargs):
-        path = self.kwargs['path']
+        path = self.kwargs['full_path']
         context = super(FilesView, self).get_context_data(**kwargs)
         context['messages'] = messages.get_messages(self.request)
-        context['token'] = Token.objects.get(user=self.request.user).key
+        try:
+            context['token'] = Token.objects.get(
+                user__id=self.request.user.id).key
+        except Token.DoesNotExist:
+            pass
 
         try:
             context.update(self.prepare_dir_context(
-                Directory.objects.get_by_full_path(path)))
+                Directory.objects.get(full_path=path)))
         except Directory.DoesNotExist:
             try:
                 context.update(self.prepare_file_context(
-                    File.objects.get_by_full_path(path)))
+                    File.objects.get(full_path=path)))
             except (Directory.DoesNotExist, File.DoesNotExist):
                 context['critical_error'] = self.errors['BAD_PATH']
 
