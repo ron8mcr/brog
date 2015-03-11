@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, Http404
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from filesharing.models import Directory, File
@@ -8,10 +8,19 @@ from filesharing.forms import CreateDirectoryForm, UploadFileForm, UpdateDirecto
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormMixin, CreateView, UpdateView, DeleteView
 from sendfile import sendfile
-from rest_framework.authtoken.models import Token
+from django.core.exceptions import PermissionDenied
+from django.shortcuts import get_object_or_404
 
 
-class AddFieldsMixin(object):
+def get_obj_or_404(klass, **kwargs):
+    try:
+        return klass.objects.get(**kwargs)
+    except klass.DoesNotExist:
+        raise Http404
+
+
+
+class SetupFormInstanceAndChecksMixin(object):
     """ Миксин для добавления дополнительных полей в экземпляр
     И дополнительных проверок, например, на права доступа
     """
@@ -22,9 +31,10 @@ class AddFieldsMixin(object):
         try:
             # если появились какие-либо ошибки при добавлении полей в форму,
             # метод сам должен записать эти ошибки и бросить исключение
-            form = self.add_fields(form)
+            form = self.setup_form_instance(form)
         except ValidationError as err:
             return self.form_invalid(form)
+
         self.additional_checks(form)
 
         if form.is_valid():
@@ -32,7 +42,7 @@ class AddFieldsMixin(object):
         else:
             return self.form_invalid(form)
 
-    def add_fields(self, form):
+    def setup_form_instance(self, form):
         return form
 
     def additional_checks(self, form):
@@ -47,11 +57,11 @@ class FormErrorMessagesMixin(object):
         return HttpResponseRedirect(self.kwargs['full_path'])
 
 
-class DirCreate(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
+class DirCreate(SetupFormInstanceAndChecksMixin, FormErrorMessagesMixin, CreateView):
     template_name = 'home.html'
     form_class = CreateDirectoryForm
 
-    def add_fields(self, form):
+    def setup_form_instance(self, form):
         form.instance.owner = self.request.user
         try:
             form.instance.parent = Directory.objects.get(full_path=self.kwargs['full_path'])
@@ -71,11 +81,11 @@ class DirCreate(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
         return super(DirCreate, self).form_valid(form)
 
 
-class FileUpload(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
+class FileUpload(SetupFormInstanceAndChecksMixin, FormErrorMessagesMixin, CreateView):
     template_name = 'home.html'
     form_class = UploadFileForm
 
-    def add_fields(self, form):
+    def setup_form_instance(self, form):
         try:
             form.instance.parent = Directory.objects.get(full_path=self.kwargs['full_path'])
         except Directory.DoesNotExist:
@@ -94,7 +104,7 @@ class FileUpload(AddFieldsMixin, FormErrorMessagesMixin, CreateView):
         return super(FileUpload, self).form_valid(form)
 
 
-class DirUpdate(AddFieldsMixin, FormErrorMessagesMixin, UpdateView):
+class DirUpdate(SetupFormInstanceAndChecksMixin, FormErrorMessagesMixin, UpdateView):
     form_class = UpdateDirectoryNameForm
 
     def post(self, request, *args, **kwargs):
@@ -126,7 +136,7 @@ class DirDelete(DeleteView):
     model = Directory
 
     def get_object(self, queryset=None):
-        return Directory.objects.get(full_path=self.kwargs['full_path'])
+        return get_obj_or_404(Directory, full_path=self.kwargs['full_path'])
 
     def delete(self, request, *args, **kwargs):
         dir_for_del = self.get_object()
@@ -144,6 +154,26 @@ class DirDelete(DeleteView):
         else:
             messages.add_message(self.request, messages.ERROR,
                                  "Вы не имеете право удалять данную директорию")
+        return HttpResponseRedirect(parent_path)
+
+
+class FileDelete(DeleteView):
+    model = File
+
+    def get_object(self, queryset=None):
+        return get_obj_or_404(File, full_path=self.kwargs['full_path'])
+
+    def delete(self, request, *args, **kwargs):
+        file_for_del = self.get_object()
+        parent_path = file_for_del.parent.full_path
+
+        if file_for_del.has_access(self.request.user):
+            file_for_del.delete()
+            messages.add_message(self.request, messages.SUCCESS,
+                                 "Файл был успешно удален")
+        else:
+            messages.add_message(self.request, messages.ERROR,
+                                 "Вы не имеете право удалять данный файл")
         return HttpResponseRedirect(parent_path)
 
 
@@ -190,15 +220,9 @@ class FilesView(FormMixin, TemplateView):
             result.update(self.navigation_inform(cur_file.parent))
             return result
 
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **context):
         path = self.kwargs['full_path']
-        context = super(FilesView, self).get_context_data(**kwargs)
         context['messages'] = messages.get_messages(self.request)
-        try:
-            context['token'] = Token.objects.get(
-                user__id=self.request.user.id).key
-        except Token.DoesNotExist:
-            pass
 
         try:
             context.update(self.prepare_dir_context(
@@ -210,12 +234,17 @@ class FilesView(FormMixin, TemplateView):
             except (Directory.DoesNotExist, File.DoesNotExist):
                 context['critical_error'] = self.errors['BAD_PATH']
 
-        return context
+        return super(FilesView, self).get_context_data(**context)
 
-    def render_to_response(self, context):
-        if 'file' in context:
-            for_send = context['file']
-            return sendfile(self.request, for_send.my_file.path,
-                            attachment=True, attachment_filename=for_send.name)
 
-        return super(FilesView, self).render_to_response(context)
+def download_file(request, **kwargs):
+    #file_ = get_obj_or_404(File, full_path=kwargs['full_path'])
+    file_ = get_object_or_404(File, full_path=kwargs['full_path'])
+    File.objects.get(pk=1)
+    if file_.has_access(request.user):
+        return sendfile(request, file_.my_file.path,
+                        attachment=True, attachment_filename=file_.name)
+    else:
+        raise PermissionDenied()
+
+

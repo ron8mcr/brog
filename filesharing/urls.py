@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.conf.urls import patterns, url
-from filesharing.views import FileUpload, DirCreate, DirUpdate, DirDelete, FilesView
+from filesharing.views import FileUpload, DirCreate, DirUpdate, DirDelete, \
+    FilesView, FileDelete, download_file
 
 
 urlpatterns = patterns('',
@@ -12,5 +13,8 @@ urlpatterns = patterns('',
         DirUpdate.as_view()),
     url(r'^delete/dir/path=(?P<full_path>.+)$',
         DirDelete.as_view()),
+    url(r'^download(?P<full_path>.+)$', download_file),
+    url(r'^delete/file/path=(?P<full_path>.+)$',
+        FileDelete.as_view()),
     url(r'(?P<full_path>.+)/$', FilesView.as_view()),
 )
