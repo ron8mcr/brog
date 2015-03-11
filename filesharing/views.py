@@ -12,14 +12,6 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 
 
-def get_obj_or_404(klass, **kwargs):
-    try:
-        return klass.objects.get(**kwargs)
-    except klass.DoesNotExist:
-        raise Http404
-
-
-
 class SetupFormInstanceAndChecksMixin(object):
     """ Миксин для добавления дополнительных полей в экземпляр
     И дополнительных проверок, например, на права доступа
@@ -136,7 +128,7 @@ class DirDelete(DeleteView):
     model = Directory
 
     def get_object(self, queryset=None):
-        return get_obj_or_404(Directory, full_path=self.kwargs['full_path'])
+        return get_object_or_404(Directory, full_path=self.kwargs['full_path'])
 
     def delete(self, request, *args, **kwargs):
         dir_for_del = self.get_object()
@@ -161,7 +153,7 @@ class FileDelete(DeleteView):
     model = File
 
     def get_object(self, queryset=None):
-        return get_obj_or_404(File, full_path=self.kwargs['full_path'])
+        return get_object_or_404(File, full_path=self.kwargs['full_path'])
 
     def delete(self, request, *args, **kwargs):
         file_for_del = self.get_object()
@@ -238,9 +230,7 @@ class FilesView(FormMixin, TemplateView):
 
 
 def download_file(request, **kwargs):
-    #file_ = get_obj_or_404(File, full_path=kwargs['full_path'])
     file_ = get_object_or_404(File, full_path=kwargs['full_path'])
-    File.objects.get(pk=1)
     if file_.has_access(request.user):
         return sendfile(request, file_.my_file.path,
                         attachment=True, attachment_filename=file_.name)

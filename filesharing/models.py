@@ -47,20 +47,25 @@ class AccessType(object):
     )
 
 
-class FullPathMixin(object):
-    """ Собственный менеджер для файлов/директорий.
+class FullPathQuerySet(models.query.QuerySet):
+    """ Собственный queryset для файлов/директорий.
     Добавляет возможность выбора директории по полному пути
     Путь передается по-разному из разных мест:
      /path, /path/, path/
     Поэтому так
     """
-    def get(self, **kwargs):
+    def _filter_or_exclude(self, negate, *args, **kwargs):
         if 'full_path' in kwargs:
             path = kwargs['full_path']
             path = path.rstrip('/')
             path = os.path.join('/', path)
             kwargs['full_path'] = path
-        return super(FullPathMixin, self).get(**kwargs)
+        return super(FullPathQuerySet, self)._filter_or_exclude(negate, *args, **kwargs)
+
+
+class FullPathMixin(object):
+    def get_query_set(self):
+        return FullPathQuerySet(self.model)
 
 
 class DirectoryManager(FullPathMixin, TreeManager):
