@@ -1,6 +1,7 @@
 from rest_framework import permissions
 from filesharing.models import Directory
 
+
 class UserPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.method == 'GET' or request.method == 'POST':
