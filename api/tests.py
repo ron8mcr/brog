@@ -49,8 +49,6 @@ class FileSharingApiTests(APITestCase):
             File.objects.create(my_file=DjangoFile(f),
                                 parent=for_user1_dir,
                                 name='file')
-
-        self.factory = APIRequestFactory()
         self.client = APIClient()
 
     def test_create_dir(self):
@@ -80,7 +78,6 @@ class FileSharingApiTests(APITestCase):
         url = '/api/dir/path=/user2/NONE/'
         data = {'name': 'dir_from_user1'}
         response = self.client.post(url, data)
-        print(response.content.decode('UTF-8'))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
         # но в которую есть доступ - можно
@@ -223,6 +220,6 @@ class FileSharingApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # куда нельзя
-        url = '/api/get/dirs/path=/user2/NONE'
+        url = '/api/get/dirs/path=/user2/NONE/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

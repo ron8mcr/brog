@@ -19,9 +19,5 @@ urlpatterns = patterns('',
     # файл по id/path
     url(r'^file/id/(?P<pk>[0-9]+)/$', FileDetail.as_view()),
     url(r'^file/path=(?P<full_path>.+)/$', FileDetail.as_view()),
-
-    # скачать файл по id/path
-    url(r'^file/download/id/(?P<pk>[0-9]+)/$', FileDownload.as_view()),
-    url(r'^file/download/path=(?P<full_path>.+)/$', FileDownload.as_view()),
 )
 

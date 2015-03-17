@@ -14,19 +14,24 @@ from api.permissions import UserPermission
 class AuthPermClassesMixin(object):
     authentication_classes = (SessionAuthentication,
                               BasicAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated, UserPermission)
+    permission_classes = [UserPermission]
 
 
 class DirDetail(AuthPermClassesMixin, generics.GenericAPIView):
     serializer_class = DirectorySerializer
 
+    def get_object(self):
+        obj = get_object_or_404(Directory, **self.kwargs)
+        self.check_object_permissions(self.request, obj)
+        return obj
+
     def get(self, request, **kwargs):
-        cur_dir = get_object_or_404(Directory, **kwargs)
+        cur_dir = self.get_object()
         serializer = DirectorySerializer(cur_dir)
         return Response(serializer.data)
 
     def post(self, request, **kwargs):
-        parent_dir = get_object_or_404(Directory, **kwargs)
+        parent_dir = self.get_object()
         self.request.DATA['owner'] = self.request.user.id
         self.request.DATA['parent'] = parent_dir.id
         serializer = DirectorySerializer(data=self.request.DATA)
@@ -37,7 +42,7 @@ class DirDetail(AuthPermClassesMixin, generics.GenericAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request, **kwargs):
-        cur_dir = get_object_or_404(Directory, **kwargs)
+        cur_dir = self.get_object()
         serializer = DirectorySerializer(cur_dir, data=request.data)
 
         if serializer.is_valid():
@@ -46,7 +51,7 @@ class DirDetail(AuthPermClassesMixin, generics.GenericAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, **kwargs):
-        cur_dir = get_object_or_404(Directory, **kwargs)
+        cur_dir = self.get_object()
         cur_dir.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -56,16 +61,19 @@ class FileDetail(AuthPermClassesMixin, generics.GenericAPIView):
 
     def get(self, request, **kwargs):
         file = get_object_or_404(File, **kwargs)
+        self.check_object_permissions(self.request, file)
         serializer = FileSerializer(file)
         return Response(serializer.data)
 
     def delete(self, request, **kwargs):
         file = get_object_or_404(klass=File, **kwargs)
+        self.check_object_permissions(self.request, file)
         file.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def post(self, request, **kwargs):
         cur_dir = get_object_or_404(Directory, **kwargs)
+        self.check_object_permissions(self.request, cur_dir)
         data = self.request.POST.copy()
         data.update(self.request.FILES.copy())
         data['parent'] = cur_dir.id
