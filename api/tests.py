@@ -4,7 +4,8 @@ from filesharing.models import User, AccessType, Directory, File
 from rest_framework import status
 
 
-class FileSharingApiTests(APITestCase):
+# TODO: factory_boy
+class SetUpTestEnvironmentMixin(APITestCase):
     def setUp(self):
         self.user1 = User.objects.create(username='user1', password='123456')
         self.user2 = User.objects.create(username='user2', password='123456')
@@ -48,176 +49,245 @@ class FileSharingApiTests(APITestCase):
                                 parent=for_user1_dir,
                                 name='file')
         self.client = APIClient()
-
-    def test_create_dir(self):
         self.client.force_authenticate(user=self.user1)
 
-        # можно создать директорию у себя
-        url = '/api/dir/path=/user1/'
-        data = {'name': 'dir2'}
-        response = self.client.post(url, data)
+    def print_response(self, response):
+        print(response.content.decode('UTF-8'))
+
+
+class DirCreationTests(SetUpTestEnvironmentMixin, APITestCase):
+    def setUp(self):
+        super(DirCreationTests, self).setUp()
+        self.url = '/api/dir/'
+        self.new_dir = {
+            'name': 'new_dir',
+            'parent': self.user1.home_directory.id
+        }
+
+    def test_create_valid_dir_in_home_dir(self):
+        """ можно создать директорию у себя """
+        response = self.client.post(self.url, self.new_dir)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # но ещё одну с таким же именем - нет
-        response = self.client.post(url, data)
+    def test_duplicate_names(self):
+        response = self.client.post(self.url, self.new_dir)
+        response = self.client.post(self.url, self.new_dir)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-        # с "плохими" именами - нет
-        data = {'name': 'dir2/dir3'}
-        response = self.client.post(url, data)
+    def test_names_with_slash(self):
+        new_dir = self.new_dir
+        new_dir.update({'name': 'dir1/dir2'})
+        response = self.client.post(self.url, new_dir)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-        # и папку с таким же именем, как у файла - тоже нет
-        data = {'name': 'file1'}
-        response = self.client.post(url, data)
+    def test_duplicate_name_with_file(self):
+        new_dir = self.new_dir
+        new_dir.update({'name': 'file1'})
+        response = self.client.post(self.url, new_dir)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-        # в папке, в которую нет доступа - тоже нельзя
-        url = '/api/dir/path=/user2/NONE/'
-        data = {'name': 'dir_from_user1'}
-        response = self.client.post(url, data)
+    def test_create_access_none(self):
+        new_dir = self.new_dir
+        new_dir.update({
+            'parent': Directory.objects.get(full_path='/user2/NONE').id
+        })
+        response = self.client.post(self.url, new_dir)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        # но в которую есть доступ - можно
-        url = '/api/dir/path=/user2/ALL/'
-        response = self.client.post(url, data)
+    def test_create_access_all(self):
+        new_dir = self.new_dir
+        new_dir.update({
+            'parent': Directory.objects.get(full_path='/user2/ALL').id
+        })
+        response = self.client.post(self.url, new_dir)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        url = '/api/dir/path=/user2/FOR_USER1/'
-        response = self.client.post(url, data)
+    def test_create_access_group(self):
+        new_dir = self.new_dir
+        new_dir.update({
+            'parent': Directory.objects.get(full_path='/user2/ALL').id
+        })
+        response = self.client.post(self.url, new_dir)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    def test_create_file(self):
-        self.client.force_authenticate(user=self.user1)
 
-        # можно создать файл у себя
-        url = '/api/file/path=/user1/'
-        data = {
-            'name': 'file',
-            'my_file': open('manage.py', 'rb')
+class DirDeletionTests(SetUpTestEnvironmentMixin, APITestCase):
+    def test_delete(self):
+        new_dir = {
+            'name': 'new_dir',
+            'parent': self.user1.home_directory.id
         }
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-         # но ещё один с таким же именем - нет
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        # с "плохими" именами - нет
-        data.update({'name': 'dir1/file'})
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        # и файл с таким же именем, как у папки - тоже нет
-        data.update({'name': 'dir1'})
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        # в папке, в которую нет доступа - тоже нельзя
-        url = '/api/file/path=/user2/NONE/'
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-        # но в которую есть доступ - можно
-        url = '/api/file/path=/user2/ALL/'
-        data = {
-            'name': 'file_from_user1',
-            'my_file': open('manage.py', 'rb')
-        }
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        url = '/api/file/path=/user2/FOR_USER1/'
-        data = {
-            'name': 'file_from_user1',
-            'my_file': open('manage.py', 'rb')
-        }
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-    def test_delete_dir(self):
-        self.client.force_authenticate(user=self.user1)
-
-        url = '/api/dir/path=/user1/'
-        data = {'name': 'dir2'}
-        response = self.client.post(url, data)
+        response = self.client.post('/api/dir/', new_dir)
 
         # удалим только что созданную директорию
-        url = '/api/dir/id/{}/'.format(response.data['id'])
+        url = '/api/dir/path/user1/new_dir/'
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-        # удалим по несуществующему пути
-        response = self.client.delete(url)
+    def test_delete_not_existing(self):
+        response = self.client.delete('/api/dir/10000/')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-        # домашнюю директорию удалять нельзя
-        url = '/api/dir/path=/user1/'
+    def test_delete_home_dir(self):
+        url = '/api/dir/path/user1/'
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        # чужие директории удалять тоже нельзя
-        url = '/api/dir/path=/user2/NONE/'
+    def test_delete_access_no(self):
+        url = '/api/dir/path/user2/NONE/'
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        # но к которым есть доступ - можно
-        url = '/api/dir/path=/user2/FOR_USER1/'
+    def test_delete_access_all(self):
+        url = '/api/dir/path/user2/ALL/'
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-    def test_delete_file(self):
-        self.client.force_authenticate(user=self.user1)
+    def test_delete_access_group(self):
+        url = '/api/dir/path/user2/FOR_USER1/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-        url = '/api/file/path=/user1/'
-        data = {
-            'name': 'file',
+
+class DirRenameTests(SetUpTestEnvironmentMixin, APITestCase):
+    def test_rename(self):
+        url = '/api/dir/path/user1/dir1/'
+        response = self.client.put(url, {'name': 'dir2'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_rename_home_dir(self):
+        url = '/api/dir/path/user1/'
+        response = self.client.put(url, {'name': 'dir2'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_rename_same_name_as_file(self):
+        url = '/api/dir/path/user1/dir1'
+        response = self.client.put(url, {'name': 'file1'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_rename_access_no(self):
+        url = '/api/dir/path/user2/NONE'
+        response = self.client.put(url, {'name': 'dir2'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_rename_access_all(self):
+        url = '/api/dir/path/user2/ALL'
+        response = self.client.put(url, {'name': 'dir2'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_rename_access_group(self):
+        url = '/api/dir/path/user2/FOR_USER1'
+        response = self.client.put(url, {'name': 'dir2'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class FileCreationTests(SetUpTestEnvironmentMixin, APITestCase):
+    def setUp(self):
+        super(FileCreationTests, self).setUp()
+        self.url = '/api/file/'
+        self.new_file = {
+            'name': 'new_file',
+            'parent': self.user1.home_directory.id,
             'my_file': open('manage.py', 'rb')
         }
-        response = self.client.post(url, data)
+
+    def test_create(self):
+        response = self.client.post(self.url, self.new_file)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_duplicate_names(self):
+        response = self.client.post(self.url, self.new_file)
+        response = self.client.post(self.url, self.new_file)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_names_with_slash(self):
+        self.new_file.update({'name': 'file1/2'})
+        response = self.client.post(self.url, self.new_file)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_duplicate_name_with_directory(self):
+        self.new_file.update({'name': 'dir1'})
+        response = self.client.post(self.url, self.new_file)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_access_none(self):
+        self.new_file.update({
+            'parent': Directory.objects.get(full_path='/user2/NONE').id
+        })
+        response = self.client.post(self.url, self.new_file)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_access_all(self):
+        self.new_file.update({
+            'parent': Directory.objects.get(full_path='/user2/ALL').id
+        })
+        response = self.client.post(self.url, self.new_file)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_create_access_group(self):
+        self.new_file.update({
+            'parent': Directory.objects.get(full_path='/user2/ALL').id
+        })
+        response = self.client.post(self.url, self.new_file)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+class FileDeletionTests(SetUpTestEnvironmentMixin, APITestCase):
+    def test_delete(self):
+        new_file = {
+            'name': 'new_file',
+            'parent': self.user1.home_directory.id,
+            'my_file': open('manage.py', 'rb')
+        }
+        response = self.client.post('/api/file/', new_file)
 
         # удалим только что созданный файл
-        url = '/api/file/id/{}/'.format(response.data['id'])
+        url = '/api/file/path/user1/new_file/'
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-        # удалим по несуществующему пути
-        response = self.client.delete(url)
+    def test_delete_not_existing(self):
+        response = self.client.delete('/api/file/10000/')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-        # чужой файл
-        url = '/api/file/path=/user2/NONE/file/'
+    def test_delete_access_no(self):
+        url = '/api/file/path/user2/NONE/file/'
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        # но к которым есть доступ - можно
-        url = '/api/file/path=/user2/FOR_USER1/file/'
+    def test_delete_access_all(self):
+        url = '/api/file/path/user2/ALL/file/'
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-    def test_ls_dir(self):
-        self.client.force_authenticate(user=self.user1)
+    def test_delete_access_group(self):
+        url = '/api/file/path/user2/FOR_USER1/file/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-        # пробуем получить список своих файлов
-        url = '/api/get/dirs/path=/user1/'
+
+class ListDirTests(SetUpTestEnvironmentMixin, APITestCase):
+    def test_ls_home_dir(self):
+        url = '/api/dir/path/user1/list_dirs/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # обращаемся по несуществующему адресу
-        url = '/api/get/dirs/path=/userF/'
+    def test_ls_not_existing(self):
+        url = '/api/dir/path/userF/list_dirs/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-        # куда можно у другого пользователя
-        url = '/api/get/files/path=/user2/ALL/'
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        url = '/api/get/files/path=/user2/FOR_USER1/'
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        # куда нельзя
-        url = '/api/get/files/path=/user2/NONE/'
+    def test_ls_access_no(self):
+        url = '/api/dir/path/user2/NONE/list_dirs/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_ls_access_all(self):
+        url = '/api/dir/path/user2/ALL/list_dirs/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_ls_access_all(self):
+        url = '/api/dir/path/user2/FOR_USER1/list_dirs/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

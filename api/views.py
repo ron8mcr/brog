@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 from django.shortcuts import get_object_or_404, get_list_or_404
 from rest_framework import generics
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
+from rest_framework import viewsets, mixins
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
-from filesharing.models import Directory, File
-from api.serializers import DirectorySerializer, FileSerializer
+from api.serializers import *
 from api.permissions import UserPermission
+from rest_framework.decorators import detail_route
 
 
 class AuthPermClassesMixin(object):
@@ -16,86 +16,79 @@ class AuthPermClassesMixin(object):
     permission_classes = [UserPermission]
 
 
-class DirDetail(AuthPermClassesMixin, generics.GenericAPIView):
-    serializer_class = DirectorySerializer
+class DirectoryViewSet(AuthPermClassesMixin,
+                       viewsets.ModelViewSet):
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return DirectoryCreateSerializer
+        elif self.request.method == 'PUT':
+            return DirectoryRenameSerializer
+        else:
+            return DirectoryRetrieveSerializer
 
     def get_object(self):
         obj = get_object_or_404(Directory, **self.kwargs)
         self.check_object_permissions(self.request, obj)
         return obj
 
-    def get(self, request, **kwargs):
-        cur_dir = self.get_object()
-        serializer = DirectorySerializer(cur_dir)
-        return Response(serializer.data)
+    def get_queryset(self):
+        # return Directory.objects.filter(owner=self.request.user).order_by('full_path')
+        return Directory.objects.all().order_by('full_path')
 
-    def post(self, request, **kwargs):
-        parent_dir = self.get_object()
-        self.request.DATA['owner'] = self.request.user.id
-        self.request.DATA['parent'] = parent_dir.id
-        serializer = DirectorySerializer(data=self.request.DATA)
+    def perform_create(self, serializer):
+        serializer.check_permissions(self.request.user)
+        serializer.save(owner=self.request.user)
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @detail_route(methods=['get'])
+    def list_dirs(self, request, **kwargs):
+        parent = get_object_or_404(Directory, **kwargs)
+        self.check_object_permissions(request, parent)
+        queryset = Directory.objects.filter(parent=parent)
+        return Response(DirectoryRetrieveSerializer(queryset, many=True).data,
+                        status=status.HTTP_200_OK)
 
-    def put(self, request, **kwargs):
-        cur_dir = self.get_object()
-        serializer = DirectorySerializer(cur_dir, data=request.data)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, **kwargs):
-        cur_dir = self.get_object()
-        cur_dir.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    @detail_route(methods=['get'])
+    def list_files(self, request, **kwargs):
+        parent = get_object_or_404(Directory, **kwargs)
+        self.check_object_permissions(request, parent)
+        queryset = File.objects.filter(parent=parent)
+        return Response(FileRetrieveSerializer(queryset, many=True).data,
+                        status=status.HTTP_200_OK)
 
 
-class FileDetail(AuthPermClassesMixin, generics.GenericAPIView):
-    serializer_class = FileSerializer
+class FileViewSet(AuthPermClassesMixin,
+                  mixins.CreateModelMixin,
+                  mixins.ListModelMixin,
+                  mixins.RetrieveModelMixin,
+                  mixins.DestroyModelMixin,
+                  viewsets.GenericViewSet):
 
-    def get(self, request, **kwargs):
-        file = get_object_or_404(File, **kwargs)
-        self.check_object_permissions(self.request, file)
-        serializer = FileSerializer(file)
-        return Response(serializer.data)
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return FileUploadSerializer
+        else:
+            return FileRetrieveSerializer
 
-    def delete(self, request, **kwargs):
-        file = get_object_or_404(klass=File, **kwargs)
-        self.check_object_permissions(self.request, file)
-        file.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    def post(self, request, **kwargs):
-        cur_dir = get_object_or_404(Directory, **kwargs)
-        self.check_object_permissions(self.request, cur_dir)
-        data = self.request.POST.copy()
-        data.update(self.request.FILES.copy())
-        data['parent'] = cur_dir.id
-        serializer = FileSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class DirsList(AuthPermClassesMixin, generics.ListAPIView):
-    serializer_class = DirectorySerializer
+    def get_object(self):
+        obj = get_object_or_404(File, **self.kwargs)
+        self.check_object_permissions(self.request, obj)
+        return obj
 
     def get_queryset(self):
-        cur_dir = get_object_or_404(Directory, **self.kwargs)
-        self.check_object_permissions(self.request, cur_dir)
-        return get_list_or_404(Directory, parent=cur_dir)
+        # return File.objects.filter(owner=self.request.user).order_by('full_path')
+        return File.objects.all().order_by('full_path')
 
+    def create(self, request, *args, **kwargs):
+        """ Измненён только возвращаемый сериалайзер
+        """
+        serializer = FileUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        serializer = FileRetrieveSerializer(serializer.instance)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-class FilesList(AuthPermClassesMixin, generics.ListAPIView):
-    serializer_class = FileSerializer
-
-    def get_queryset(self):
-        cur_dir = get_object_or_404(Directory, **self.kwargs)
-        self.check_object_permissions(self.request, cur_dir)
-        return get_list_or_404(File, parent=cur_dir)
+    def perform_create(self, serializer):
+        serializer.check_permissions(self.request.user)
+        serializer.save()
