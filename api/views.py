@@ -7,7 +7,6 @@ from rest_framework.authentication import SessionAuthentication, BasicAuthentica
 from rest_framework.permissions import IsAuthenticated
 from filesharing.models import Directory, File
 from api.serializers import DirectorySerializer, FileSerializer
-
 from api.permissions import UserPermission
 
 
@@ -89,6 +88,7 @@ class DirsList(AuthPermClassesMixin, generics.ListAPIView):
 
     def get_queryset(self):
         cur_dir = get_object_or_404(Directory, **self.kwargs)
+        self.check_object_permissions(self.request, cur_dir)
         return get_list_or_404(Directory, parent=cur_dir)
 
 
@@ -97,4 +97,5 @@ class FilesList(AuthPermClassesMixin, generics.ListAPIView):
 
     def get_queryset(self):
         cur_dir = get_object_or_404(Directory, **self.kwargs)
-        get_list_or_404(File, parent=cur_dir)
+        self.check_object_permissions(self.request, cur_dir)
+        return get_list_or_404(File, parent=cur_dir)

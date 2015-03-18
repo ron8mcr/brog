@@ -8,10 +8,8 @@ class FileSharingApiTests(APITestCase):
     def setUp(self):
         self.user1 = User.objects.create(username='user1', password='123456')
         self.user2 = User.objects.create(username='user2', password='123456')
-        self.user3 = User.objects.create(username='user3', password='123456')
         Directory.objects.create(name='user1', owner=self.user1)
         Directory.objects.create(name='user2', owner=self.user2)
-        Directory.objects.create(name='user3', owner=self.user3)
 
         # /user1/dir1
         Directory.objects.create(name='dir1',
@@ -220,6 +218,6 @@ class FileSharingApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # куда нельзя
-        url = '/api/get/dirs/path=/user2/NONE/'
+        url = '/api/get/files/path=/user2/NONE/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
