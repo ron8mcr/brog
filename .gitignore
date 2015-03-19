@@ -67,3 +67,5 @@ staticfiles/
 *.ini
 *.conf
 uwsgi_params*
+
+activate

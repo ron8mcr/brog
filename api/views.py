@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-from django.shortcuts import get_object_or_404, get_list_or_404
-from rest_framework import generics
+from django.shortcuts import get_object_or_404
+from rest_framework import viewsets, mixins, status
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
-from rest_framework import viewsets, mixins
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.decorators import detail_route
 from api.serializers import *
 from api.permissions import UserPermission
-from rest_framework.decorators import detail_route
 
 
 class AuthPermClassesMixin(object):
@@ -37,23 +35,25 @@ class DirectoryViewSet(AuthPermClassesMixin,
         return Directory.objects.all().order_by('full_path')
 
     def perform_create(self, serializer):
-        serializer.check_permissions(self.request.user)
         serializer.save(owner=self.request.user)
 
     @detail_route(methods=['get'])
     def list_dirs(self, request, **kwargs):
-        parent = get_object_or_404(Directory, **kwargs)
-        self.check_object_permissions(request, parent)
-        queryset = Directory.objects.filter(parent=parent)
-        return Response(DirectoryRetrieveSerializer(queryset, many=True).data,
-                        status=status.HTTP_200_OK)
+        return self.list_content(request, Directory,
+                                 DirectoryRetrieveSerializer, **kwargs)
 
     @detail_route(methods=['get'])
     def list_files(self, request, **kwargs):
+        return self.list_content(request, File,
+                                 FileRetrieveSerializer, **kwargs)
+
+    def list_content(self, request, klass, serializer, **kwargs):
         parent = get_object_or_404(Directory, **kwargs)
         self.check_object_permissions(request, parent)
-        queryset = File.objects.filter(parent=parent)
-        return Response(FileRetrieveSerializer(queryset, many=True).data,
+        queryset = klass.objects.filter(parent=parent)
+        serializer.context = {'request': request}
+        return Response(serializer(queryset, many=True,
+                                   context=self.get_serializer_context()).data,
                         status=status.HTTP_200_OK)
 
 
@@ -78,17 +78,3 @@ class FileViewSet(AuthPermClassesMixin,
     def get_queryset(self):
         # return File.objects.filter(owner=self.request.user).order_by('full_path')
         return File.objects.all().order_by('full_path')
-
-    def create(self, request, *args, **kwargs):
-        """ Измненён только возвращаемый сериалайзер
-        """
-        serializer = FileUploadSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        serializer = FileRetrieveSerializer(serializer.instance)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-
-    def perform_create(self, serializer):
-        serializer.check_permissions(self.request.user)
-        serializer.save()

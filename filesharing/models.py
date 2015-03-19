@@ -64,7 +64,7 @@ class FullPathQuerySet(models.query.QuerySet):
 
 
 class FullPathMixin(object):
-    def get_query_set(self):
+    def get_queryset(self):
         return FullPathQuerySet(self.model)
 
 

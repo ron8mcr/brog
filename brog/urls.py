@@ -16,7 +16,7 @@ urlpatterns = patterns('',
         template_name='profile.html')),
     url(r'^admin/', include(admin.site.urls)),
     url(r'^api/', include('api.urls')),
-    url(r'^', include('filesharing.urls')),
+    url(r'^', include('filesharing.urls', namespace='filesharing')),
 )
 
 # TEMP для просмотра загруженных файлов
