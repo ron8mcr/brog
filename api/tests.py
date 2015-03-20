@@ -2,52 +2,48 @@ from rest_framework.test import APITestCase, APIRequestFactory, APIClient
 from django.core.files import File as DjangoFile
 from filesharing.models import User, AccessType, Directory, File
 from rest_framework import status
+from factories import UserFactory, DirFactory, FileFactory
 
 
 # TODO: factory_boy
 class SetUpTestEnvironmentMixin(APITestCase):
     def setUp(self):
-        self.user1 = User.objects.create(username='user1', password='123456')
-        self.user2 = User.objects.create(username='user2', password='123456')
-        Directory.objects.create(name='user1', owner=self.user1)
-        Directory.objects.create(name='user2', owner=self.user2)
+        self.user1 = UserFactory(username='user1')
+        self.user2 = UserFactory(username='user2')
+        
+        DirFactory.create(name='user1', owner=self.user1)
+        DirFactory.create(name='user2', owner=self.user2)
 
         # /user1/dir1
-        Directory.objects.create(name='dir1',
+        DirFactory.create(name='dir1',
                                  parent=self.user1.home_directory,
                                  owner=self.user1)
         # /user1/file1
-        with open('manage.py', 'rb') as f:
-            File.objects.create(my_file=DjangoFile(f),
-                                parent=self.user1.home_directory,
-                                name='file1')
+        FileFactory.create(parent=self.user1.home_directory, name='file1')
 
-        none_dir = Directory.objects.create(name='NONE',
+        none_dir = DirFactory.create(name='NONE',
                                             parent=self.user2.home_directory,
                                             access_type=AccessType.NONE,
                                             owner=self.user2)
-        with open('manage.py', 'rb') as f:
-            File.objects.create(my_file=DjangoFile(f),
-                                parent=none_dir,
-                                name='file')
-        all_dir = Directory.objects.create(name='ALL',
+
+        FileFactory.create(parent=none_dir, name='file')
+                                
+        all_dir = DirFactory.create(name='ALL',
                                            parent=self.user2.home_directory,
                                            access_type=AccessType.ALL,
                                            owner=self.user2)
-        with open('manage.py', 'rb') as f:
-            File.objects.create(my_file=DjangoFile(f),
-                                parent=all_dir,
-                                name='file')
+
+        FileFactory.create(parent=all_dir, name='file')
+        
         for_user1_dir = Directory.objects.create(name='FOR_USER1',
                                                  parent=self.user2.home_directory,
                                                  access_type=AccessType.GROUP,
                                                  owner=self.user2)
         for_user1_dir.allowed_users.add(self.user1)
         for_user1_dir.save()
-        with open('manage.py', 'rb') as f:
-            File.objects.create(my_file=DjangoFile(f),
-                                parent=for_user1_dir,
-                                name='file')
+
+        FileFactory.create(parent=for_user1_dir, name='file')
+        
         self.client = APIClient()
         self.client.force_authenticate(user=self.user1)
 
