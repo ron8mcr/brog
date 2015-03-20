@@ -60,7 +60,8 @@ class FullPathQuerySet(models.query.QuerySet):
             path = path.rstrip('/')
             path = os.path.join('/', path)
             kwargs['full_path'] = path
-        return super(FullPathQuerySet, self)._filter_or_exclude(negate, *args, **kwargs)
+        return super(FullPathQuerySet, self)._filter_or_exclude(
+            negate, *args, **kwargs)
 
 
 class FullPathMixin(object):
@@ -78,7 +79,8 @@ class CheckNameMixin(object):
     """
     def clean(self):
         if '/' in self.name:
-            raise ValidationError("Запрещено использовать такие символы в имени")
+            raise ValidationError(
+                "Запрещено использовать такие символы в имени")
 
         if Directory.objects.filter(parent=self.parent, name=self.name).first():
             raise ValidationError(
@@ -137,7 +139,8 @@ def set_dir_path(sender, instance, **kwargs):
     if instance.is_root_node():
         instance.full_path = os.path.join('/', instance.name)
     else:
-        instance.full_path = os.path.join(instance.parent.full_path, instance.name)
+        instance.full_path = os.path.join(instance.parent.full_path,
+                                          instance.name)
 
 
 @receiver(post_save, sender=Directory)
@@ -158,7 +161,7 @@ def update_children_path(sender, instance, **kwargs):
         child_dir.save()
 
 
-class FileManager(FullPathMixin,Manager):
+class FileManager(FullPathMixin, Manager):
     pass
 
 

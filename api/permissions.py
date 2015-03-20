@@ -9,4 +9,5 @@ class UserPermission(permissions.BasePermission):
         elif request.method == 'POST':
             return obj.parent.has_access(request.user)
         else:
-            return obj.has_access(request.user) and obj not in Directory.objects.root_nodes()
+            return obj.has_access(request.user) and \
+                   obj not in Directory.objects.root_nodes()

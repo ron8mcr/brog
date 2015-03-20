@@ -42,7 +42,8 @@ class MyFileField(serializers.FileField):
     """
     def to_representation(self, value):
         request = self.context.get('request', None)
-        return request.build_absolute_uri("/download{}".format(value.instance.full_path))
+        return request.build_absolute_uri("/download{}".format(
+            value.instance.full_path))
 
 
 class FileUploadSerializer(ValidateCreationMixin,

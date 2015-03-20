@@ -1,21 +1,25 @@
 # -*- coding: utf-8 -*-
 
-from django.http import HttpResponseRedirect, Http404
+from django.http import HttpResponseRedirect
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from filesharing.models import Directory, File
-from filesharing.forms import CreateDirectoryForm, UploadFileForm, UpdateDirectoryNameForm
 from django.views.generic import TemplateView
-from django.views.generic.edit import FormMixin, CreateView, UpdateView, DeleteView
+from django.views.generic.edit import FormMixin, CreateView, UpdateView, \
+    DeleteView
 from sendfile import sendfile
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
+
+from filesharing.models import Directory, File
+from filesharing.forms import CreateDirectoryForm, UploadFileForm, \
+    UpdateDirectoryNameForm
 
 
 class SetupFormInstanceAndChecksMixin(object):
     """ Миксин для добавления дополнительных полей в экземпляр
     И дополнительных проверок, например, на права доступа
     """
+
     def post(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         form = self.get_form(form_class)
@@ -49,14 +53,16 @@ class FormErrorMessagesMixin(object):
         return HttpResponseRedirect(self.kwargs['full_path'])
 
 
-class DirCreate(SetupFormInstanceAndChecksMixin, FormErrorMessagesMixin, CreateView):
+class DirCreate(SetupFormInstanceAndChecksMixin,
+                FormErrorMessagesMixin, CreateView):
     template_name = 'home.html'
     form_class = CreateDirectoryForm
 
     def setup_form_instance(self, form):
         form.instance.owner = self.request.user
         try:
-            form.instance.parent = Directory.objects.get(full_path=self.kwargs['full_path'])
+            form.instance.parent = Directory.objects.get(
+                full_path=self.kwargs['full_path'])
         except Directory.DoesNotExist:
             form.add_error(None, "Неверный путь")
             raise ValidationError
@@ -64,22 +70,26 @@ class DirCreate(SetupFormInstanceAndChecksMixin, FormErrorMessagesMixin, CreateV
 
     def additional_checks(self, form):
         if not form.instance.parent.has_access(self.request.user):
-            form.add_error(None, "Вы не имеете прав доступа к данной директории!")
+            form.add_error(None,
+                           "Вы не имеете прав доступа к данной директории!")
 
     def form_valid(self, form):
         self.success_url = self.kwargs['full_path']
         messages.add_message(self.request, messages.SUCCESS,
-                             "Директория \"{}\" успешно cоздана".format(form.instance.name))
+                             "Директория \"{}\" успешно cоздана".format(
+                                 form.instance.name))
         return super(DirCreate, self).form_valid(form)
 
 
-class FileUpload(SetupFormInstanceAndChecksMixin, FormErrorMessagesMixin, CreateView):
+class FileUpload(SetupFormInstanceAndChecksMixin,
+                 FormErrorMessagesMixin, CreateView):
     template_name = 'home.html'
     form_class = UploadFileForm
 
     def setup_form_instance(self, form):
         try:
-            form.instance.parent = Directory.objects.get(full_path=self.kwargs['full_path'])
+            form.instance.parent = Directory.objects.get(
+                full_path=self.kwargs['full_path'])
         except Directory.DoesNotExist:
             form.add_error(None, "Неверный путь")
             raise ValidationError
@@ -87,16 +97,19 @@ class FileUpload(SetupFormInstanceAndChecksMixin, FormErrorMessagesMixin, Create
 
     def additional_checks(self, form):
         if not form.instance.parent.has_access(self.request.user):
-            form.add_error(None, "Вы не имеете прав доступа к данной директории!")
+            form.add_error(None,
+                           "Вы не имеете прав доступа к данной директории!")
 
     def form_valid(self, form):
         self.success_url = self.kwargs['full_path']
         messages.add_message(self.request, messages.SUCCESS,
-                             "Файл \"{}\" успешно загружен".format(form.instance.name))
+                             "Файл \"{}\" успешно загружен".format(
+                                 form.instance.name))
         return super(FileUpload, self).form_valid(form)
 
 
-class DirUpdate(SetupFormInstanceAndChecksMixin, FormErrorMessagesMixin, UpdateView):
+class DirUpdate(SetupFormInstanceAndChecksMixin,
+                FormErrorMessagesMixin, UpdateView):
     form_class = UpdateDirectoryNameForm
 
     def post(self, request, *args, **kwargs):
@@ -112,7 +125,8 @@ class DirUpdate(SetupFormInstanceAndChecksMixin, FormErrorMessagesMixin, UpdateV
             form.add_error(None, "Невозможно переименовать домашнюю директорию")
             return
         if not for_rename.has_access(self.request.user):
-            form.add_error(None, "Вы не имеете прав доступа к данной директории!")
+            form.add_error(
+                None, "Вы не имеете прав доступа к данной директории!")
 
     def form_valid(self, form):
         for_rename = self.get_object()
@@ -236,5 +250,3 @@ def download_file(request, **kwargs):
                         attachment=True, attachment_filename=file_.name)
     else:
         raise PermissionDenied()
-
-

@@ -24,4 +24,4 @@ STATICFILES_DIRS = (
 )
 
 SENDFILE_BACKEND = 'sendfile.backends.development'
-#SENDFILE_BACKEND = 'sendfile.backends.nginx'
+# SENDFILE_BACKEND = 'sendfile.backends.nginx'

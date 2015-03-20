@@ -130,7 +130,7 @@ MEDIA_URL = '/media/'
 STATIC_URL = '/static/'
 
 SENDFILE_BACKEND = 'sendfile.backends.development'
-#SENDFILE_BACKEND = 'sendfile.backends.nginx'
+# SENDFILE_BACKEND = 'sendfile.backends.nginx'
 SENDFILE_ROOT = os.path.join(BASE_DIR, 'media')
 SENDFILE_URL = '/media'
 

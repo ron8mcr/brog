@@ -1,22 +1,27 @@
-from filesharing.models import User, AccessType, Directory, File
+from filesharing.models import User, Directory, File
 import factory
-import random
-from tempfile import TemporaryFile
+
 
 class UserFactory(factory.django.DjangoModelFactory):
-     class Meta:
+    class Meta:
         model = User
-    
+
+    username = factory.Sequence(lambda n: 'user_{}'.format(n))
     password = '123456'
 
-    
+
 class DirFactory(factory.django.DjangoModelFactory):
-      class Meta:
+    class Meta:
         model = Directory
+
+    name = factory.Sequence(lambda n: 'dir_{}'.format(n))
+    owner = factory.LazyAttribute(lambda a: UserFactory())
 
 
 class FileFactory(factory.django.DjangoModelFactory):
-      class Meta:
+    class Meta:
         model = File
-        
-      my_file = TemporaryFile()
+
+    name = factory.Sequence(lambda n: 'file_{}'.format(n))
+    parent = factory.LazyAttribute(lambda a: DirFactory())
+    my_file = factory.django.FileField(data=b'file content')

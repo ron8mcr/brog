@@ -27,4 +27,3 @@ urlpatterns = patterns('',
      url(r'^file/path/(?P<full_path>.+)$', file_detail),
      url(r'^', include(router.urls)),
 )
-

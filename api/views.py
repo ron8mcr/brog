@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, mixins, status
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
+from rest_framework.authentication import SessionAuthentication, \
+    BasicAuthentication, TokenAuthentication
 from rest_framework.response import Response
 from rest_framework.decorators import detail_route
 from api.serializers import *
@@ -31,8 +32,9 @@ class DirectoryViewSet(AuthPermClassesMixin,
         return obj
 
     def get_queryset(self):
-        # return Directory.objects.filter(owner=self.request.user).order_by('full_path')
-        return Directory.objects.all().order_by('full_path')
+        return Directory.objects.filter(
+            owner=self.request.user).order_by('full_path')
+        # return Directory.objects.all().order_by('full_path')
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -76,5 +78,6 @@ class FileViewSet(AuthPermClassesMixin,
         return obj
 
     def get_queryset(self):
-        # return File.objects.filter(owner=self.request.user).order_by('full_path')
-        return File.objects.all().order_by('full_path')
+        return File.objects.filter(
+            owner=self.request.user).order_by('full_path')
+        # return File.objects.all().order_by('full_path')
