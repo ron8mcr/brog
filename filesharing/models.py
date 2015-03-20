@@ -148,16 +148,16 @@ def update_children_path(sender, instance, **kwargs):
     """
     Обновление полных путей для всех вложенных папок и файлов
     """
-    for file in File.objects.filter(parent=instance):
-        file.full_path = os.path.join(instance.full_path, file.name)
-        file.save()
+    for child_file in File.objects.filter(parent=instance):
+        child_file.full_path = os.path.join(instance.full_path, child_file.name)
+        child_file.save()
 
     for child_dir in instance.get_children():
         child_dir.full_path = os.path.join(
             '/', *[i.name for i in child_dir.get_ancestors(include_self=True)])
-        for file in File.objects.filter(parent=child_dir):
-            file.full_path = os.path.join(child_dir.full_path, file.name)
-            file.save()
+        for child_file in File.objects.filter(parent=child_dir):
+            child_file.full_path = os.path.join(child_dir.full_path, child_file.name)
+            child_file.save()
         child_dir.save()
 
 

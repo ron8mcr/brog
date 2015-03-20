@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.conf.urls import patterns, url, include
 from rest_framework.routers import DefaultRouter
-from api.views import *
+from api.views import DirectoryViewSet, FileViewSet
 
 router = DefaultRouter()
 router.register(r'dir', DirectoryViewSet, base_name='Directory')

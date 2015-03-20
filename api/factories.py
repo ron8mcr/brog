@@ -3,7 +3,7 @@ import factory
 
 
 class UserFactory(factory.django.DjangoModelFactory):
-    class Meta:
+    class Meta(object):
         model = User
 
     username = factory.Sequence(lambda n: 'user_{}'.format(n))
@@ -11,7 +11,7 @@ class UserFactory(factory.django.DjangoModelFactory):
 
 
 class DirFactory(factory.django.DjangoModelFactory):
-    class Meta:
+    class Meta(object):
         model = Directory
 
     name = factory.Sequence(lambda n: 'dir_{}'.format(n))
@@ -19,7 +19,7 @@ class DirFactory(factory.django.DjangoModelFactory):
 
 
 class FileFactory(factory.django.DjangoModelFactory):
-    class Meta:
+    class Meta(object):
         model = File
 
     name = factory.Sequence(lambda n: 'file_{}'.format(n))

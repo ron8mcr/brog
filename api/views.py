@@ -5,8 +5,11 @@ from rest_framework.authentication import SessionAuthentication, \
     BasicAuthentication, TokenAuthentication
 from rest_framework.response import Response
 from rest_framework.decorators import detail_route
-from api.serializers import *
+from api.serializers import DirectoryCreateSerializer, \
+    DirectoryRetrieveSerializer, DirectoryRenameSerializer, \
+    FileRetrieveSerializer, FileUploadSerializer
 from api.permissions import UserPermission
+from filesharing.models import Directory, File
 
 
 class AuthPermClassesMixin(object):
